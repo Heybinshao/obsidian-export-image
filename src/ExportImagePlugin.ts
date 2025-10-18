@@ -19,7 +19,7 @@ import exportImage from './components/file/exportImage';
 export default class ExportImagePlugin extends Plugin {
   settings: ISettings;
 
-  async epxortFile(file: TFile) {
+  async exportFile(file: TFile) {
     const frontmatter = getMetadata(file, this.app);
     const markdown = await this.app.vault.cachedRead(file);
     await exportImage(this.app, this.settings, markdown, file, frontmatter, 'file');
@@ -36,7 +36,7 @@ export default class ExportImagePlugin extends Plugin {
               .setTitle(L.exportImage())
               .setIcon('image-down')
               .onClick(async () => {
-                await this.epxortFile(file);
+                await this.exportFile(file);
               });
           });
         } else if (file instanceof TFolder) {
