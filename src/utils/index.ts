@@ -81,6 +81,49 @@ export async function delay(time: number) {
   });
 }
 
+/**
+ * Wait for async code block processors (e.g. SQLSeal, Dataview) to finish
+ * rendering inside a container element.
+ *
+ * After MarkdownRenderer.render(), code block processors run asynchronously.
+ * This function observes DOM mutations and resolves once the element has been
+ * stable (no new mutations) for `stabilityMs`. A hard `timeoutMs` cap prevents
+ * indefinite waiting.
+ */
+export function waitForAsyncRenderers(
+  element: HTMLElement,
+  stabilityMs = 500,
+  timeoutMs = 5000,
+): Promise<void> {
+  return new Promise(resolve => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const done = () => {
+      observer.disconnect();
+      clearTimeout(timer);
+      clearTimeout(hardTimeout);
+      resolve();
+    };
+
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(done, stabilityMs);
+    });
+
+    observer.observe(element, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    // Kick off the stability timer in case no mutations happen at all
+    timer = setTimeout(done, stabilityMs);
+
+    // Hard cap so we never block the export indefinitely
+    const hardTimeout = setTimeout(done, timeoutMs);
+  });
+}
+
 export function getMime(format: FileFormat) {
   return `image/${format.includes('png') ? 'png' : (format === 'jpg' ? 'jpeg' : format)}`;
 }
