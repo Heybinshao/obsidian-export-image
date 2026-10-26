@@ -1,14 +1,21 @@
-<center>
+# 「binshao」Export Image
 
-![obsidian-export-image](https://socialify.git.ci/zhouhua/obsidian-export-image/image?custom_description=Easily+convert+your+article+to+image&description=1&font=KoHo&language=1&logo=https%3A%2F%2Fobsidian.md%2Fimages%2Fobsidian-logo-gradient.svg&name=1&owner=1&pattern=Charlie+Brown&stargazers=1&theme=Auto)
-
-</center>
-
-# Obsidian Export Image Plugin
-
-![GitHub Release](https://img.shields.io/github/v/release/zhouhua/obsidian-export-image?include_prereleases&style=flat) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/zhouhua/obsidian-export-image/total?style=flat)
+> 这是 [zhouhua/obsidian-export-image](https://github.com/zhouhua/obsidian-export-image) 的 fork，面向 Obsidian 1.15+（Pele）重写了导出管线，并补了设置持久化、移动端 canvas/相册路径、图片原图与字体按需内嵌。
+>
+> 原项目 MIT，Copyright (c) 2024 Zhou Hua；本 fork 的修改 Copyright (c) 2026 binshao。原项目与本 fork 无隶属关系，完整归属声明见 [NOTICE](./NOTICE)。
 
 This Obsidian plugin can easily help you export any article as an image.
+
+## Fork changes
+
+- 导出改为在导出宽度下用 `MarkdownRenderer` 重新渲染，不再抓编辑器 DOM。
+- 适配 Obsidian 1.15+ 的 Pele：按导出宽度重挂载、移除 `.pele-zoom`、等字体稳定。
+- 字体按实际使用情况内嵌；桌面端本地字体可用时跳过 base64。
+- 内嵌图片读取 vault 原图，避免 2x/3x 放大显示分辨率图。
+- split/PDF 单次栅格化后裁页；移动端按 canvas 面积预算自动降 scale。
+- 导出弹窗设置持久化；头像/名称（含备注）垂直居中。
+- 默认边距 20px。
+
 
 ## Features
 

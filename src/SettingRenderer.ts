@@ -49,7 +49,14 @@ export class SettingRenderer {
     }
     this.containerEl.empty();
     this.containerEl.createEl('h3', { text: L.setting.title() });
-    this.containerEl.createEl('p', { text: 'Github: ' }).createEl('a', {
+    this.containerEl.createEl('p', { text: 'Fork by binshao: ' }).createEl('a', {
+      text: 'Heybinshao',
+      attr: {
+        href: 'https://github.com/Heybinshao',
+        target: '_blank',
+      },
+    });
+    this.containerEl.createEl('p', { text: '原项目: ' }).createEl('a', {
       text: 'zhouhua/obsidian-export-image',
       attr: {
         href: 'https://github.com/zhouhua/obsidian-export-image',

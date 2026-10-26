@@ -1,8 +1,10 @@
 {
-  "name": "obsidian-export-image",
+  "name": "binshao-export-image",
   "version": "2.4.5",
-  "description": "This Obsidian plugin can easily help you export any article as an image.",
+  "description": "Fork of zhouhua/obsidian-export-image for Obsidian 1.15+ / Pele, with export pipeline, mobile and settings fixes.",
   "main": "main.js",
+  "author": "binshao",
+  "homepage": "https://binshao.top",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && cross-env NODE_ENV=production node esbuild.config.mjs production",
