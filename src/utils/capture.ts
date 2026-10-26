@@ -69,7 +69,7 @@ async function makePdf(blob: Blob, el: HTMLElement) {
   });
   pdf.addImage(
     dataUrl,
-    'JPEG',
+    'PNG',
     0,
     0,
     el.clientWidth / 96,
@@ -95,7 +95,7 @@ export async function save(
   const blob: Blob = await getBlob(
     el,
     resolutionMode,
-    getMime(format),
+    format === 'pdf' ? 'image/png' : getMime(format),
   );
   const filename = `${title.replaceAll(/\s+/g, '_')}.${format.replace(/\d$/, '')}`;
   switch (format) {
@@ -306,7 +306,7 @@ export async function saveAll(
       let pdf: JsPdf | undefined;
 
       for (const { startY, height } of splitPositions) {
-        const blob = await pageBlob(startY, height, 'image/jpeg');
+        const blob = await pageBlob(startY, height, 'image/png');
         const dataUrl = await fileToBase64(blob);
 
         if (!pdf) {
@@ -320,7 +320,7 @@ export async function saveAll(
           pdf.addPage([pageWidth / 96, height / 96], pageWidth > height ? 'l' : 'p');
         }
 
-        pdf.addImage(dataUrl, 'JPEG', 0, 0, pageWidth / 96, height / 96);
+        pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth / 96, height / 96);
       }
 
       const filename = `${title.replaceAll(/\s+/g, '_')}.pdf`;
