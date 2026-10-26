@@ -18,7 +18,7 @@ async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: st
   await waitForFonts();
   await nextFrame();
 
-  const scale = getScale(resolutionMode);
+  const scale = getEffectiveScale(el, resolutionMode);
   return domtoimage.toBlob(el, {
     width: el.clientWidth,
     height: el.clientHeight,
@@ -34,6 +34,25 @@ async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: st
 
 function getScale(resolutionMode: ResolutionMode): number {
   return resolutionMode === '2x' ? 2 : resolutionMode === '3x' ? 3 : resolutionMode === '4x' ? 4 : 1;
+}
+
+/**
+ * Mobile Safari/WebView dies when a canvas exceeds roughly 16M pixels; a 3x
+ * export of a long note easily crosses that and the export appears to hang.
+ * Lower the scale instead of allocating an impossible canvas.
+ */
+function getEffectiveScale(el: HTMLElement, resolutionMode: ResolutionMode): number {
+  const requested = getScale(resolutionMode);
+  const area = el.clientWidth * el.clientHeight;
+  if (!area) return requested;
+
+  const maxArea = Platform.isMobile ? 16_000_000 : 64_000_000;
+  const maxScale = Math.sqrt(maxArea / area);
+  const effective = Math.max(1, Math.min(requested, Math.floor(maxScale * 100) / 100));
+  if (effective < requested) {
+    console.warn(`export-image: scale reduced from ${requested}x to ${effective}x to fit the canvas budget`);
+  }
+  return effective;
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -53,7 +72,7 @@ async function getFullCanvas(el: HTMLElement, resolutionMode: ResolutionMode): P
   return domtoimage.toCanvas(el, {
     width: el.clientWidth,
     height: el.clientHeight,
-    scale: getScale(resolutionMode),
+    scale: getEffectiveScale(el, resolutionMode),
     requestUrl,
     skipLocalFonts: !Platform.isMobile,
   }) as Promise<HTMLCanvasElement>;
@@ -84,6 +103,44 @@ async function saveToVault(app: App, blob: Blob, filename: string) {
   return filePath;
 }
 
+type MobileMediaPlugin = {
+  savePhoto?: (options: { base64?: string; album?: string; path?: string }) => Promise<unknown>;
+};
+
+async function saveMobile(app: App, blob: Blob, filename: string): Promise<void> {
+  const capacitor = (window as unknown as {
+    Capacitor?: { Plugins?: { Media?: MobileMediaPlugin } };
+  }).Capacitor;
+  const media = capacitor?.Plugins?.Media;
+
+  if (media?.savePhoto) {
+    try {
+      await media.savePhoto({ base64: await fileToBase64(blob), album: 'Obsidian' });
+      new Notice(L.saveSuccess({ filePath: '相册' }));
+      return;
+    } catch (error) {
+      console.warn('export-image: Media.savePhoto failed, falling back to share sheet', error);
+    }
+  }
+
+  const file = new File([blob], filename, { type: blob.type || 'image/png' });
+  const canShare = typeof navigator.canShare === 'function'
+    && navigator.canShare({ files: [file] });
+  if (canShare) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      new Notice('已打开分享面板，请选择“存储图像”保存到相册');
+      return;
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      console.warn('export-image: share sheet failed, falling back to vault', error);
+    }
+  }
+
+  const filePath = await saveToVault(app, blob, filename);
+  new Notice(L.saveSuccess({ filePath }));
+}
+
 export async function save(
   app: App,
   el: HTMLElement,
@@ -104,11 +161,7 @@ export async function save(
     case 'png0':
     case 'png1': {
       if (isMobile) {
-        const filePath = await app.fileManager.getAvailablePathForAttachment(
-          filename,
-        );
-        await app.vault.createBinary(filePath, await blob.arrayBuffer());
-        new Notice(L.saveSuccess({ filePath }));
+        await saveMobile(app, blob, filename);
       } else {
         saveAs(blob, filename);
       }
@@ -119,11 +172,11 @@ export async function save(
     case 'pdf': {
       const pdf = await makePdf(blob, el);
       if (isMobile) {
-        const filePath = await app.fileManager.getAvailablePathForAttachment(
+        await saveMobile(
+          app,
+          new Blob([pdf.output('arraybuffer')], { type: 'application/pdf' }),
           filename,
         );
-        await app.vault.createBinary(filePath, pdf.output('arraybuffer'));
-        new Notice(L.saveSuccess({ filePath }));
       } else {
         pdf.save(filename);
       }
@@ -248,7 +301,7 @@ export async function saveAll(
       splitPositions.push({ startY: 0, height: Math.max(1, totalHeight) });
     }
 
-    const scale = getScale(resolutionMode);
+    const scale = getEffectiveScale(target.contentElement, resolutionMode);
     const pageWidth = target.contentElement.clientWidth;
     const fullHeight = target.contentElement.clientHeight;
     const maxArea = Platform.isMobile ? 16_000_000 : 64_000_000;
@@ -325,8 +378,11 @@ export async function saveAll(
 
       const filename = `${title.replaceAll(/\s+/g, '_')}.pdf`;
       if (Platform.isMobile) {
-        const filePath = await saveToVault(app, new Blob([pdf!.output('arraybuffer')]), filename);
-        new Notice(L.saveSuccess({ filePath }));
+        await saveMobile(
+          app,
+          new Blob([pdf!.output('arraybuffer')], { type: 'application/pdf' }),
+          filename,
+        );
       } else {
         pdf?.save(filename);
       }
@@ -344,10 +400,10 @@ export async function saveAll(
       }
 
       if (Platform.isMobile) {
-        // 在移动端直接保存到 vault
+        // 在移动端优先走相册/分享面板，失败才回退到 vault
         for (const { blob, filename } of blobs) {
-          const filePath = await saveToVault(app, blob, filename);
-          new Notice(L.saveSuccess({ filePath }));
+          await saveMobile(app, blob, filename);
+          await nextFrame();
         }
       } else {
         // 在桌面端创建 zip

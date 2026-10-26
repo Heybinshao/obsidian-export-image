@@ -186,8 +186,10 @@ const ModalContent: FC<{
   title: string;
   app: App;
   metadataMap: Record<string, { type: MetadataType }>;
-}> = ({ markdownEl, settings, app, frontmatter, title, metadataMap }) => {
+  onSettingsChange?: (settings: ISettings) => void;
+}> = ({ markdownEl, settings, app, frontmatter, title, metadataMap, onSettingsChange }) => {
   const [formData, setFormData] = useState<ISettings>(settings);
+  const persistedRef = useRef(JSON.stringify(settings));
   const [isGrabbing, setIsGrabbing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const previewOutRef = useRef<HTMLDivElement>(null);
@@ -197,6 +199,18 @@ const ModalContent: FC<{
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(formData);
+    if (serialized === persistedRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      persistedRef.current = serialized;
+      onSettingsChange?.(formData);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [formData, onSettingsChange]);
 
   useEffect(() => {
     // 当markdownEl准备好时，更新loading状态

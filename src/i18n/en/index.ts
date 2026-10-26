@@ -38,7 +38,7 @@ const en = {
     },
     padding: {
       title: 'Image Padding',
-      description: 'Set padding for the exported image. The default is 6px for all sides.',
+      description: 'Set padding for the exported image. The default is 20px for all sides.',
       top: 'Top padding',
       right: 'Right padding',
       bottom: 'Bottom padding',

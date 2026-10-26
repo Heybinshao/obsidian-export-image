@@ -10,6 +10,7 @@
 - 2026-10-27：M0 完成。仓库为本地工作副本，分支 `feat/fork-m1`；合入 PR #129（异步等待）与 PR #120（callout + MarkdownRenderer），构建通过。
 - 2026-10-27：M1 第一轮完成。新增 `renderHost`（attached host、字体/图片/异步/Pele 等待、`.pele-zoom` 清理）；`exportImage`/`makeHTML` 改为在导出宽度下 canonical 渲染；设置深合并 + 旧 `2x` 迁移；格式探测校验 `blob.type`；split 空结果回退单页。`pnpm build` 与 `tsc` 通过。
 - 2026-10-27：M2 性能第一轮完成。`@font-face` 只嵌入导出子树实际用到的 family/weight；桌面端 `local()` 命中时跳过 32MB base64；split/PDF 改为整篇渲染一次后裁页，超过 canvas 面积预算才回退逐页。新增 4 个测试文件、11 个测试，全绿。
+- 2026-10-27：M2 保真补充。内嵌图片通过 `vault.resolveFileUrl` 找回原文件并转 data URL，避免 2x/3x 放大显示分辨率图；PDF 改用 PNG 入页；CI 改 pnpm + 单一 lockfile。新增图片 hydrate 测试，12 个测试全绿。
 - 待真机验收：用 `fixtures/vault` 在 Obsidian 1.15.0 上导出 11 篇 fixture；重点看 Pele 图宽/字号、文件夹导出、callout、长文、split。
 
 ## 0. 结论

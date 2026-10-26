@@ -92,25 +92,34 @@ If your plugin does not need CSS, delete this file.
 }
 .export-image-root .user-info-container {
   display: flex;
+  align-items: center;
   padding: 16px 32px;
-  alignitems: center;
+}
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 36px;
 }
 .user-info-avatar {
+  flex: 0 0 auto;
   width: 36px;
   height: 36px;
   border-radius: 50%;
   border: 1px solid var(--background-modifier-border);
   background-size: cover;
-  margin: 0 20px;
+  margin: 0 20px 0 0;
 }
 .export-image-root .user-info-name {
   font-size: 16px;
-  padding-bottom: 6px;
+  line-height: 1.25;
 }
 .export-image-root .user-info-remark {
   opacity: 0.5;
   font-size: 12px;
+  line-height: 1.25;
   white-space: nowrap;
+  margin-top: 2px;
 }
 
 .export-image-preview-actions {

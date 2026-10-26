@@ -9,10 +9,10 @@ export const DEFAULT_SETTINGS: ISettings = {
   recursive: false,
   quickExportSelection: false,
   padding: {
-    top: 6,
-    right: 6,
-    bottom: 6,
-    left: 6,
+    top: 20,
+    right: 20,
+    bottom: 20,
+    left: 20,
   },
   authorInfo: {
     show: false,

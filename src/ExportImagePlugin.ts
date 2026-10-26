@@ -19,10 +19,15 @@ import exportImage from './components/file/exportImage';
 export default class ExportImagePlugin extends Plugin {
   settings: ISettings;
 
+  private persistSettings = (settings: ISettings) => {
+    this.settings = normalizeSettings(settings);
+    void this.saveSettings();
+  };
+
   async exportFile(file: TFile) {
     const frontmatter = getMetadata(file, this.app);
     const markdown = await this.app.vault.cachedRead(file);
-    await exportImage(this.app, this.settings, markdown, file, frontmatter, 'file');
+    await exportImage(this.app, this.settings, markdown, file, frontmatter, 'file', this.persistSettings);
   }
 
   async onload() {
@@ -45,7 +50,7 @@ export default class ExportImagePlugin extends Plugin {
               .setTitle(L.exportFolder())
               .setIcon('image-down')
               .onClick(async () => {
-                await exportFolder(this.app, this.settings, file);
+                await exportFolder(this.app, this.settings, file, this.persistSettings);
               });
           });
         }
@@ -75,6 +80,7 @@ export default class ExportImagePlugin extends Plugin {
                   file,
                   frontmatter,
                   'selection',
+                  this.persistSettings,
                 ),
               );
           });
@@ -92,6 +98,7 @@ export default class ExportImagePlugin extends Plugin {
                 file,
                 frontmatter,
                 'file',
+                this.persistSettings,
               ),
             );
         });
@@ -124,6 +131,7 @@ export default class ExportImagePlugin extends Plugin {
               activeFile,
               frontmatter,
               'file',
+              this.persistSettings,
             );
           })();
         }
@@ -153,6 +161,7 @@ export default class ExportImagePlugin extends Plugin {
             file,
             frontmatter,
             'selection',
+            this.persistSettings,
           );
         }
         return true;

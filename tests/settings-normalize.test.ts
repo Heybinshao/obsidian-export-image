@@ -12,7 +12,7 @@ describe('normalizeSettings', () => {
     });
 
     expect(settings.resolutionMode).toBe('2x');
-    expect(settings.padding).toEqual({ top: 6, right: 6, bottom: 6, left: 6 });
+    expect(settings.padding).toEqual({ top: 20, right: 20, bottom: 20, left: 20 });
     expect(settings.watermark.opacity).toBe(0.2);
     expect(settings.watermark.width).toBe(120);
     expect(settings.split.height).toBe(1000);
@@ -27,7 +27,7 @@ describe('normalizeSettings', () => {
     });
 
     expect(settings.width).toBe(20);
-    expect(settings.padding).toEqual({ top: 6, right: 6, bottom: 6, left: 6 });
+    expect(settings.padding).toEqual({ top: 20, right: 20, bottom: 20, left: 20 });
     expect(settings.split.mode).toBe('none');
     expect(settings.split.height).toBe(50);
     expect(settings.split.overlap).toBe(0);

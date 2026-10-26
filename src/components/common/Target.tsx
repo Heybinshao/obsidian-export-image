@@ -238,7 +238,7 @@ const Target = forwardRef<
                 ></div>
               )}
               {setting.authorInfo.name && (
-                <div>
+                <div className='user-info-text'>
                   <div className='user-info-name'>{setting.authorInfo.name}</div>
                   {setting.authorInfo.remark && (
                     <div className='user-info-remark'>

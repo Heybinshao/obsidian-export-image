@@ -17,8 +17,10 @@ const ModalContent: FC<{
   app: App;
   folder: TFolder;
   close: () => void;
-}> = ({ settings, app, folder, close }) => {
+  onSettingsChange?: (settings: ISettings) => void;
+}> = ({ settings, app, folder, close, onSettingsChange }) => {
   const [formData, setFormData] = useState<ISettings>(settings);
+  const persistedRef = useRef(JSON.stringify(settings));
   const [fileList, setFileList] = useState<TFile[]>([]);
   const [selectFiles, setSelectFiles] = useState<TFile[]>([]);
   const [finished, setFinished] = useState<number>(0);
@@ -33,6 +35,18 @@ const ModalContent: FC<{
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(formData);
+    if (serialized === persistedRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      persistedRef.current = serialized;
+      onSettingsChange?.(formData);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [formData, onSettingsChange]);
 
   const exportAll = useCallback(async () => {
     if (running) {

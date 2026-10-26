@@ -24,6 +24,7 @@ export default async function (
   file: TFile,
   frontmatter: FrontMatterCache | undefined,
   type: 'file' | 'selection',
+  persistSettings?: (settings: ISettings) => void,
 ) {
   const source = preprocessMarkdown(markdown, frontmatter);
   const contentWidth = getContentWidth(settings);
@@ -120,6 +121,7 @@ export default async function (
       title={file.basename}
       metadataMap={metadataMap}
       app={app}
+      onSettingsChange={persistSettings}
     />,
   );
 
