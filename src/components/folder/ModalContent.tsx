@@ -54,6 +54,7 @@ const ModalContent: FC<{
     }
 
     setRunning(true);
+    onSettingsChange?.(formData);
     await saveMultipleFiles(
       selectFiles,
       formData,

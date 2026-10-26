@@ -300,6 +300,7 @@ const ModalContent: FC<{
     }
     if (!root.current) return;
 
+    onSettingsChange?.(formData);
     setProcessing(true);
     try {
       await save(
@@ -322,6 +323,7 @@ const ModalContent: FC<{
     }
     if (!root.current) return;
 
+    onSettingsChange?.(formData);
     setProcessing(true);
     try {
       await copy(root.current.contentElement, formData.resolutionMode, formData.format);
@@ -339,6 +341,7 @@ const ModalContent: FC<{
     }
     if (!root.current) return;
 
+    onSettingsChange?.(formData);
     setProcessing(true);
     try {
       await saveAll(
