@@ -22,6 +22,10 @@
     styleCaching: 'strict',
     // Default cors config is to request the image address directly
     corsImg: undefined,
+    // Skip @font-face rules whose local() source is already available.
+    // Desktop Obsidian usually has the user's font installed; embedding a
+    // 32 MB base64 WOFF2 into every SVG is pure waste there.
+    skipLocalFonts: false,
   };
 
   const domtoimage = {
@@ -270,6 +274,8 @@
     domtoimage.impl.options.httpTimeout = options.httpTimeout === undefined ? defaultOptions.httpTimeout : options.httpTimeout;
 
     domtoimage.impl.options.styleCaching = options.styleCaching === undefined ? defaultOptions.styleCaching : options.styleCaching;
+
+    domtoimage.impl.options.skipLocalFonts = options.skipLocalFonts === undefined ? defaultOptions.skipLocalFonts : options.skipLocalFonts;
 
     domtoimage.impl.options.requestUrl = options.requestUrl;
     domtoimage.impl.options.type = options.type || 'image/png';
@@ -562,7 +568,7 @@
   }
 
   function embedFonts(node) {
-    return fontFaces.resolveAll().then(cssText => {
+    return fontFaces.resolveAll(node).then(cssText => {
       if (cssText !== '') {
         const styleNode = document.createElement('style');
         node.append(styleNode);
@@ -1083,12 +1089,99 @@
       },
     };
 
-    function resolveAll() {
+    function resolveAll(node) {
+      const used = collectUsedFonts(node);
       return readAll()
+        .then(webFonts => webFonts.filter(webFont => {
+          const family = webFont.family.toLowerCase();
+          const usage = used.get(family);
+          if (!usage) return false;
+
+          const weightOk = [...usage.weights].some(weight => weightMatches(webFont.weight, weight));
+          const styleOk = [...usage.styles].some(style => styleMatches(webFont.style, style));
+          if (!weightOk || !styleOk) return false;
+
+          if (
+            domtoimage.impl.options.skipLocalFonts
+            && /local\(/i.test(webFont.src)
+            && localFontAvailable(webFont.family)
+          ) {
+            return false;
+          }
+
+          return true;
+        }))
         .then(webFonts => Promise.all(
           webFonts.map(webFont => webFont.resolve()),
         ))
         .then(cssStrings => cssStrings.join('\n'));
+    }
+
+    function collectUsedFonts(node) {
+      const used = new Map();
+      const elements = [node, ...node.querySelectorAll('*')];
+
+      for (const element of elements) {
+        if (!util.isElement(element)) continue;
+        const style = getComputedStyle(element);
+        const familyList = style.fontFamily || '';
+        const weight = normalizeWeight(style.fontWeight);
+        const fontStyle = style.fontStyle || 'normal';
+
+        for (const rawFamily of familyList.split(',')) {
+          const family = unquote(rawFamily);
+          if (!family) continue;
+          const key = family.toLowerCase();
+          let usage = used.get(key);
+          if (!usage) {
+            usage = { weights: new Set(), styles: new Set() };
+            used.set(key, usage);
+          }
+          usage.weights.add(weight);
+          usage.styles.add(fontStyle);
+        }
+      }
+
+      return used;
+    }
+
+    function unquote(value) {
+      return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+    }
+
+    function normalizeWeight(value) {
+      if (!value || value === 'normal') return '400';
+      if (value === 'bold') return '700';
+      const number = Number.parseInt(value, 10);
+      return Number.isFinite(number) ? String(number) : '400';
+    }
+
+    function weightMatches(ruleWeight, usedWeight) {
+      if (!ruleWeight || ruleWeight === 'normal') return usedWeight === '400';
+      if (ruleWeight === 'bold') return usedWeight === '700';
+
+      const values = String(ruleWeight)
+        .split(/\s+/)
+        .map(value => Number.parseInt(value, 10))
+        .filter(Number.isFinite);
+      if (values.length === 0) return true;
+
+      const weight = Number(usedWeight);
+      if (values.length === 1) return weight === values[0];
+      return weight >= Math.min(...values) && weight <= Math.max(...values);
+    }
+
+    function styleMatches(ruleStyle, usedStyle) {
+      if (!ruleStyle || ruleStyle === 'normal') return usedStyle === 'normal';
+      return ruleStyle === usedStyle;
+    }
+
+    function localFontAvailable(family) {
+      try {
+        return Boolean(document.fonts?.check(`16px "${family}"`));
+      } catch {
+        return false;
+      }
     }
 
     function readAll() {
@@ -1106,12 +1199,7 @@
       function getCssRules(styleSheets) {
         const cssRules = [];
         for (const sheet of styleSheets) {
-          if (
-            Object.hasOwn(
-              Object.getPrototypeOf(sheet),
-              'cssRules',
-            )
-          ) {
+          if ('cssRules' in sheet) {
             try {
               util
                 .asArray(sheet.cssRules || [])
@@ -1130,12 +1218,13 @@
 
       function newWebFont(webFontRule) {
         return {
+          family: unquote(webFontRule.style.getPropertyValue('font-family')),
+          weight: webFontRule.style.getPropertyValue('font-weight') || 'normal',
+          style: webFontRule.style.getPropertyValue('font-style') || 'normal',
+          src: webFontRule.style.getPropertyValue('src'),
           resolve: function resolve() {
             const baseUrl = (webFontRule.parentStyleSheet || {}).href;
             return inliner.inlineAll(webFontRule.cssText, baseUrl);
-          },
-          src() {
-            return webFontRule.style.getPropertyValue('src');
           },
         };
       }

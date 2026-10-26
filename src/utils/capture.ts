@@ -18,7 +18,7 @@ async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: st
   await waitForFonts();
   await nextFrame();
 
-  const scale = resolutionMode === '2x' ? 2 : resolutionMode === '3x' ? 3 : resolutionMode === '4x' ? 4 : 1;
+  const scale = getScale(resolutionMode);
   return domtoimage.toBlob(el, {
     width: el.clientWidth,
     height: el.clientHeight,
@@ -26,7 +26,37 @@ async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: st
     scale: scale,
     requestUrl,
     type,
+    // On desktop the user's font is usually installed locally; embedding the
+    // 32 MB base64 copy into every SVG is the main export slowdown.
+    skipLocalFonts: !Platform.isMobile,
   }) as Promise<Blob>;
+}
+
+function getScale(resolutionMode: ResolutionMode): number {
+  return resolutionMode === '2x' ? 2 : resolutionMode === '3x' ? 3 : resolutionMode === '4x' ? 4 : 1;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error('canvas.toBlob returned null'));
+    }, type, 0.85);
+  });
+}
+
+async function getFullCanvas(el: HTMLElement, resolutionMode: ResolutionMode): Promise<HTMLCanvasElement> {
+  await inlineCalloutIconsDynamic(el, false, true);
+  await waitForFonts();
+  await nextFrame();
+
+  return domtoimage.toCanvas(el, {
+    width: el.clientWidth,
+    height: el.clientHeight,
+    scale: getScale(resolutionMode),
+    requestUrl,
+    skipLocalFonts: !Platform.isMobile,
+  }) as Promise<HTMLCanvasElement>;
 }
 
 async function makePdf(blob: Blob, el: HTMLElement) {
@@ -218,35 +248,79 @@ export async function saveAll(
       splitPositions.push({ startY: 0, height: Math.max(1, totalHeight) });
     }
 
+    const scale = getScale(resolutionMode);
+    const pageWidth = target.contentElement.clientWidth;
+    const fullHeight = target.contentElement.clientHeight;
+    const maxArea = Platform.isMobile ? 16_000_000 : 64_000_000;
+
+    // Render the whole note once and crop pages from that bitmap. The old
+    // loop re-cloned the DOM, re-embedded fonts and re-inlined images for
+    // every page, so a 5-page split cost roughly 5× a single export.
+    let fullCanvas: HTMLCanvasElement | undefined;
+    if (pageWidth > 0 && fullHeight > 0 && pageWidth * scale * fullHeight * scale <= maxArea) {
+      try {
+        fullCanvas = await getFullCanvas(target.contentElement, resolutionMode);
+      } catch (error) {
+        console.error('export-image: full canvas failed, falling back to per-page render', error);
+      }
+    }
+
+    const pageBlob = async (startY: number, height: number, type: string): Promise<Blob> => {
+      if (fullCanvas) {
+        const pixelScale = fullCanvas.width / pageWidth;
+        const sourceY = Math.min(
+          fullCanvas.height - 1,
+          Math.max(0, Math.round(startY * pixelScale)),
+        );
+        const sourceHeight = Math.max(
+          1,
+          Math.min(fullCanvas.height - sourceY, Math.round(height * pixelScale)),
+        );
+        const page = document.createElement('canvas');
+        page.width = fullCanvas.width;
+        page.height = sourceHeight;
+        const context = page.getContext('2d');
+        if (!context) throw new Error('cannot create 2d context for split page');
+        context.drawImage(
+          fullCanvas,
+          0,
+          sourceY,
+          fullCanvas.width,
+          sourceHeight,
+          0,
+          0,
+          page.width,
+          page.height,
+        );
+        return canvasToBlob(page, type);
+      }
+
+      target.setClip(startY, height);
+      await nextFrame();
+      await nextFrame(); // 等待布局与字体稳定
+      return getBlob(target.element, resolutionMode, type);
+    };
+
     if (format === 'pdf') {
       // PDF 格式：创建多页 PDF
       let pdf: JsPdf | undefined;
 
       for (const { startY, height } of splitPositions) {
-        // 设置裁剪区域
-        target.setClip(startY, height);
-        await nextFrame();
-        await nextFrame(); // 等待布局与字体稳定
-
-        const blob = await getBlob(
-          target.element,
-          resolutionMode,
-          'image/jpeg'
-        );
+        const blob = await pageBlob(startY, height, 'image/jpeg');
         const dataUrl = await fileToBase64(blob);
 
         if (!pdf) {
           pdf = new JsPdf({
             unit: 'in',
-            format: [target.element.clientWidth / 96, height / 96],
-            orientation: target.element.clientWidth > height ? 'l' : 'p',
+            format: [pageWidth / 96, height / 96],
+            orientation: pageWidth > height ? 'l' : 'p',
             compress: true,
           });
         } else {
-          pdf.addPage([target.element.clientWidth / 96, height / 96], target.element.clientWidth > height ? 'l' : 'p');
+          pdf.addPage([pageWidth / 96, height / 96], pageWidth > height ? 'l' : 'p');
         }
 
-        pdf.addImage(dataUrl, 'JPEG', 0, 0, target.element.clientWidth / 96, height / 96);
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, pageWidth / 96, height / 96);
       }
 
       const filename = `${title.replaceAll(/\s+/g, '_')}.pdf`;
@@ -264,12 +338,7 @@ export async function saveAll(
 
       for (let i = 0; i < splitPositions.length; i++) {
         const { startY, height } = splitPositions[i];
-        // 设置裁剪区域
-        target.setClip(startY, height);
-        await nextFrame();
-        await nextFrame(); // 等待布局与字体稳定
-
-        const blob = await getBlob(target.element, resolutionMode, getMime(format));
+        const blob = await pageBlob(startY, height, getMime(format));
         const filename = `${title.replaceAll(/\s+/g, '_')}_${i + 1}.${ext}`;
         blobs.push({ blob, filename });
       }
