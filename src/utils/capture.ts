@@ -1,6 +1,7 @@
 import {
   Notice, Platform, requestUrl, type App, type TFile,
 } from 'obsidian';
+import { inlineCalloutIconsDynamic } from './calloutIcons';
 import saveAs from 'file-saver';
 import JsPdf from 'jspdf';
 import JSZip from 'jszip';
@@ -11,6 +12,9 @@ import { fileToBase64, delay, getMime } from '.';
 import { calculateSplitPositions, getElementMeasures } from './split';
 
 async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: string): Promise<Blob> {
+  // Inline callout icons before capture (inject fallbacks if needed for export)
+  await inlineCalloutIconsDynamic(el, false, true);
+
   const scale = resolutionMode === '2x' ? 2 : resolutionMode === '3x' ? 3 : resolutionMode === '4x' ? 4 : 1;
   return domtoimage.toBlob(el, {
     width: el.clientWidth,
@@ -131,7 +135,6 @@ export async function saveMultipleFiles(
 ) {
   let finished = 0;
   const { format, resolutionMode, split } = settings;
-  const blobs: { blob: Blob; filename: string }[] = [];
 
   for (const file of files) {
     const el = await makeHTML(file, settings, app, containner) as HTMLElement;

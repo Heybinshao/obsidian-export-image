@@ -1,4 +1,5 @@
 import { type App, type FrontMatterCache } from 'obsidian';
+import { inlineCalloutIconsDynamic } from 'src/utils/calloutIcons';
 import React, {
   forwardRef, useEffect, useRef, useState, useImperativeHandle, useMemo,
 } from 'react';
@@ -84,19 +85,35 @@ const Target = forwardRef<
   } as const), [scale]);
 
   useEffect(() => {
-    if (!contentRef.current) {
-      return;
-    }
-    contentRef.current.innerHTML = '';
-    Array.from(markdownEl.childNodes).forEach(child => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        if (child.textContent) {
-          contentRef.current?.append(child.textContent);
+    if (!contentRef.current || !markdownEl) return;
+
+    const update = () => {
+      if (!contentRef.current) return;
+      contentRef.current.innerHTML = '';
+      Array.from(markdownEl.childNodes).forEach(child => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          if (child.textContent) contentRef.current?.append(child.textContent);
+        } else {
+          contentRef.current?.append(child.cloneNode(true));
         }
-      } else {
-        contentRef.current?.append(child.cloneNode(true));
-      }
-    });
+      });
+      // Preserve and style callout icons (don't inject fallbacks in preview mode)
+      void inlineCalloutIconsDynamic(contentRef.current, false, false);
+    };
+
+    update();
+
+    // Observe DOM changes for async post-processors
+    const observer = new MutationObserver(() => update());
+    observer.observe(markdownEl as Node, { childList: true, subtree: true, characterData: true });
+
+    const onLoaded = () => update();
+    window.document.addEventListener('export-image-content-loaded', onLoaded);
+
+    return () => {
+      observer.disconnect();
+      window.document.removeEventListener('export-image-content-loaded', onLoaded);
+    };
   }, [markdownEl]);
 
   useImperativeHandle(ref, () => ({
@@ -246,4 +263,3 @@ const Target = forwardRef<
 });
 
 export default Target;
-
