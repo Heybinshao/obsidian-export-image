@@ -164,6 +164,7 @@ export class SettingRenderer {
 
           // 添加删除按钮
           const deleteButton = previewDiv.createDiv({
+            cls: 'user-info-avatar-delete',
             attr: {
               style: `
                 position: absolute;
