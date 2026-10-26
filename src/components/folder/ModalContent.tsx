@@ -9,7 +9,7 @@ import { type App, TFile, TFolder } from 'obsidian';
 import L from 'src/L';
 import { delay, isMarkdownFile } from 'src/utils';
 import { saveMultipleFiles } from 'src/utils/capture';
-import { formatAvailable } from 'src/settings';
+import { formatAvailable, formatReady } from 'src/settings';
 import FormItems from '../common/form/FormItems';
 
 const ModalContent: FC<{
@@ -23,7 +23,12 @@ const ModalContent: FC<{
   const [selectFiles, setSelectFiles] = useState<TFile[]>([]);
   const [finished, setFinished] = useState<number>(0);
   const [running, setRunning] = useState<boolean>(false);
+  const [formats, setFormats] = useState<FileFormat[]>([...formatAvailable]);
   const hiddenRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void formatReady.then(() => setFormats([...formatAvailable]));
+  }, []);
 
   useEffect(() => {
     setFormData(settings);
@@ -91,7 +96,7 @@ const ModalContent: FC<{
         { value: 'jpg', text: 'jpg' },
         { value: 'webp', text: 'webp' },
         { value: 'pdf', text: 'pdf' },
-      ].filter(({ value }) => formatAvailable.contains(value as FileFormat)),
+      ].filter(({ value }) => formats.includes(value as FileFormat)),
     },
   ];
   useEffect(() => {

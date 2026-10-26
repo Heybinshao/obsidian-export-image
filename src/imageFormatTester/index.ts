@@ -57,15 +57,17 @@ export async function isCreatable(type: FileFormat): Promise<boolean> {
   const mime = getMime(type);
   return new Promise(resolve => {
     try {
-      canvas.toBlob(() => {
+      canvas.toBlob(blob => {
+        // Browsers silently fall back to PNG for unsupported MIME types.
+        const supported = Boolean(blob) && blob!.type === mime;
         if (type.includes('png')) {
-          createCache.png0 = true;
-          createCache.png1 = true;
+          createCache.png0 = supported;
+          createCache.png1 = supported;
         } else {
-          createCache[type] = true;
+          createCache[type] = supported;
         }
 
-        resolve(true);
+        resolve(supported);
       }, mime);
     } catch {
       if (type.includes('png')) {

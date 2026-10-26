@@ -4,20 +4,18 @@ import React from 'react';
 import {
   type App,
   type FrontMatterCache,
-  MarkdownRenderChild,
-  MarkdownRenderer,
-  MarkdownView,
   Modal,
   Notice,
   type TFile,
 } from 'obsidian';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import L from '../../L';
 import ModalContent from './ModalContent';
 import { preprocessMarkdown } from 'src/utils/preprocessMarkdown';
 import Target from '../common/Target';
-import { delay } from 'src/utils';
 import { copy } from 'src/utils/capture';
+import { getContentWidth, renderMarkdownHost } from 'src/utils/renderHost';
 
 export default async function (
   app: App,
@@ -27,102 +25,107 @@ export default async function (
   frontmatter: FrontMatterCache | undefined,
   type: 'file' | 'selection',
 ) {
-  // 创建元素和模态框先
-  const el = document.createElement('div');
+  const source = preprocessMarkdown(markdown, frontmatter);
+  const contentWidth = getContentWidth(settings);
   const skipConfig = type === 'selection' && settings.quickExportSelection;
-  
-  // 如果是快速导出，创建隐藏的div元素进行处理
+
+  // Quick export: render offscreen, copy, clean up. The host is attached and
+  // has the final content width so Pele lays diagrams out for the export.
   if (skipConfig) {
+    const host = await renderMarkdownHost(app, source, file.path, contentWidth);
     const div = createDiv();
-    div.style.width = (settings.width || 400) + 'px';
+    div.style.width = `${settings.width || 640}px`;
     div.style.position = 'fixed';
     div.style.top = '9999px';
     div.style.left = '9999px';
     document.body.appendChild(div);
-    const root = createRoot(div);
-    root.render(
-      <Target
-        isProcessing={true}
-        markdownEl={el}
-        setting={{ ...settings, showMetadata: false, showFilename: false, split: { overlap: 0, height: 0, mode: 'none' } }}
-        frontmatter={{}}
-        title={file.basename}
-        metadataMap={{}}
-        app={app}
-      />,
-    );
 
-    // 先打开模态框，再加载内容
-    await loadDocumentContent(app, el, preprocessMarkdown(markdown, frontmatter), file);
-    await delay(100);
+    const root = createRoot(div);
+    flushSync(() => {
+      root.render(
+        <Target
+          isProcessing={true}
+          markdownEl={host}
+          setting={{
+            ...settings,
+            showMetadata: false,
+            showFilename: false,
+            split: { overlap: 0, height: 0, mode: 'none' },
+          }}
+          frontmatter={{}}
+          title={file.basename}
+          metadataMap={{}}
+          app={app}
+        />,
+      );
+    });
+
     try {
-      await copy(div.querySelector('.export-image-root')!, settings.resolutionMode, settings.format);
-    } catch (e) {
-      console.error(e);
+      const target = div.querySelector<HTMLElement>('.export-image-root');
+      if (!target) throw new Error('export-image-root was not rendered');
+      await copy(target, settings.resolutionMode, settings.format);
+    } catch (error) {
+      console.error(error);
       new Notice(L.copyFail());
     } finally {
       root.unmount();
       div.remove();
+      host.remove();
     }
+    return;
   }
-  else {
-    // 先创建模态框并显示加载状态
-    const modal = new Modal(app);
-    modal.setTitle(L.imageExportPreview());
-    modal.modalEl.style.width = '85vw';
-    modal.modalEl.style.maxWidth = '1500px';
-    modal.open();
-    const root = createRoot(modal.contentEl);
 
-    /* @ts-ignore */
-    const metadataMap: Record<string, { type: MetadataType }> = app.metadataCache.getAllPropertyInfos();
+  const modal = new Modal(app);
+  modal.setTitle(L.imageExportPreview());
+  modal.modalEl.style.width = '85vw';
+  modal.modalEl.style.maxWidth = '1500px';
+  modal.open();
 
-    // 渲染组件，组件内部会处理loading状态
-    root.render(
-      <ModalContent
-        markdownEl={el}
-        settings={settings}
-        frontmatter={frontmatter}
-        title={file.basename}
-        metadataMap={metadataMap}
-        app={app}
-      />,
-    );
+  let host: HTMLDivElement | undefined;
+  let closed = false;
+  modal.onClose = () => {
+    closed = true;
+    host?.remove();
+  };
 
-    // 异步加载文档内容
-    await loadDocumentContent(app, el, preprocessMarkdown(markdown, frontmatter), file);
+  const loading = modal.contentEl.createDiv({ cls: 'export-image-loading' });
+  loading.createDiv({ cls: 'export-image-loading-spinner' });
+  loading.createDiv({ cls: 'export-image-loading-text', text: L.loading() });
 
-    // 发布一个自定义事件，通知内容已加载完成
-    const loadedEvent = new CustomEvent("export-image-content-loaded");
-    window.document.dispatchEvent(loadedEvent);
-    
-    modal.onClose = () => {
-      root?.unmount();
-    };
-  }
-}
-
-// 提取加载文档内容的函数
-async function loadDocumentContent(app: App, el: HTMLElement, markdown: string, file?: TFile) {
   try {
-    const container = document.createElement('div');
-    await MarkdownRenderer.render(
-      app,
-      markdown,
-      container,
-      file?.path ?? '',
-      new MarkdownRenderChild(container),
-    );
-
-    el.innerHTML = '';
-    Array.from(container.childNodes).forEach(node => {
-      el.append(node.cloneNode(true));
-    });
-
-    await delay(50);
-    return el;
+    host = await renderMarkdownHost(app, source, file.path, contentWidth);
   } catch (error) {
-    console.error('Error loading document content:', error);
-    return el;
+    console.error(error);
+    new Notice(L.saveFail());
+    modal.close();
+    return;
   }
+
+  if (closed) {
+    host.remove();
+    return;
+  }
+
+  modal.contentEl.empty();
+  const root = createRoot(modal.contentEl);
+
+  /* @ts-ignore */
+  const metadataMap: Record<string, { type: MetadataType }> = app.metadataCache.getAllPropertyInfos();
+
+  root.render(
+    <ModalContent
+      markdownEl={host}
+      settings={settings}
+      frontmatter={frontmatter}
+      title={file.basename}
+      metadataMap={metadataMap}
+      app={app}
+    />,
+  );
+
+  modal.onClose = () => {
+    closed = true;
+    root.unmount();
+    host?.remove();
+  };
 }

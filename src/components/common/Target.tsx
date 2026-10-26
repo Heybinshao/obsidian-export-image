@@ -1,7 +1,8 @@
 import { type App, type FrontMatterCache } from 'obsidian';
 import { inlineCalloutIconsDynamic } from 'src/utils/calloutIcons';
+import { stripPeleChrome } from 'src/utils/renderHost';
 import React, {
-  forwardRef, useEffect, useRef, useState, useImperativeHandle, useMemo,
+  forwardRef, useEffect, useLayoutEffect, useRef, useState, useImperativeHandle, useMemo,
 } from 'react';
 import { type WatermarkProps, Watermark } from '@pansy/react-watermark';
 import Metadata from './Metadata';
@@ -84,7 +85,7 @@ const Target = forwardRef<
     pointerEvents: 'none',
   } as const), [scale]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!contentRef.current || !markdownEl) return;
 
     const update = () => {
@@ -99,6 +100,8 @@ const Target = forwardRef<
       });
       // Preserve and style callout icons (don't inject fallbacks in preview mode)
       void inlineCalloutIconsDynamic(contentRef.current, false, false);
+      // Pele draws zoom controls inside the diagram; never capture them.
+      stripPeleChrome(contentRef.current);
     };
 
     update();
@@ -181,7 +184,7 @@ const Target = forwardRef<
             className='markdown-preview-view markdown-rendered export-image-preview-container'
             style={{
               width: `${setting.width}px`,
-              transition: 'width 0.25s',
+              transition: isProcessing ? 'none' : 'width 0.25s',
               padding: `${setting.padding.top}px ${setting.padding.right}px ${setting.padding.bottom}px ${setting.padding.left}px`,
             }}
           >

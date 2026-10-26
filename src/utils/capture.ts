@@ -8,12 +8,15 @@ import JSZip from 'jszip';
 import domtoimage from '../dom-to-image-more';
 import L from '../L';
 import makeHTML from './makeHTML';
-import { fileToBase64, delay, getMime } from '.';
+import { fileToBase64, getMime } from '.';
+import { nextFrame, waitForFonts } from './renderHost';
 import { calculateSplitPositions, getElementMeasures } from './split';
 
 async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: string): Promise<Blob> {
   // Inline callout icons before capture (inject fallbacks if needed for export)
   await inlineCalloutIconsDynamic(el, false, true);
+  await waitForFonts();
+  await nextFrame();
 
   const scale = resolutionMode === '2x' ? 2 : resolutionMode === '3x' ? 3 : resolutionMode === '4x' ? 4 : 1;
   return domtoimage.toBlob(el, {
@@ -137,21 +140,20 @@ export async function saveMultipleFiles(
   const { format, resolutionMode, split } = settings;
 
   for (const file of files) {
-    const el = await makeHTML(file, settings, app, containner) as HTMLElement;
-    await delay(20);
+    const { element, contentElement } = await makeHTML(file, settings, app, containner);
 
     const target = {
-      element: el,
-      contentElement: el,
+      element,
+      contentElement,
       setClip: (startY: number, height: number) => {
-        el.style.height = `${height}px`;
-        el.style.overflow = 'hidden';
-        el.style.transform = `translateY(-${startY}px)`;
+        element.style.height = `${height}px`;
+        element.style.overflow = 'hidden';
+        contentElement.style.transform = `translateY(-${startY}px)`;
       },
       resetClip: () => {
-        el.style.height = '';
-        el.style.overflow = '';
-        el.style.transform = '';
+        element.style.height = '';
+        element.style.overflow = '';
+        contentElement.style.transform = '';
       },
     };
 
@@ -211,6 +213,11 @@ export async function saveAll(
       totalHeight,
     }, elements);
 
+    // A note without <hr> in hr mode used to produce no pages at all.
+    if (splitPositions.length === 0) {
+      splitPositions.push({ startY: 0, height: Math.max(1, totalHeight) });
+    }
+
     if (format === 'pdf') {
       // PDF 格式：创建多页 PDF
       let pdf: JsPdf | undefined;
@@ -218,7 +225,8 @@ export async function saveAll(
       for (const { startY, height } of splitPositions) {
         // 设置裁剪区域
         target.setClip(startY, height);
-        await delay(20); // 等待渲染
+        await nextFrame();
+        await nextFrame(); // 等待布局与字体稳定
 
         const blob = await getBlob(
           target.element,
@@ -258,7 +266,8 @@ export async function saveAll(
         const { startY, height } = splitPositions[i];
         // 设置裁剪区域
         target.setClip(startY, height);
-        await delay(20); // 等待渲染
+        await nextFrame();
+        await nextFrame(); // 等待布局与字体稳定
 
         const blob = await getBlob(target.element, resolutionMode, getMime(format));
         const filename = `${title.replaceAll(/\s+/g, '_')}_${i + 1}.${ext}`;

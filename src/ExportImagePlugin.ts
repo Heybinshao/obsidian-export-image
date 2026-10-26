@@ -10,7 +10,7 @@ import {
 } from 'obsidian';
 import L from './L';
 import { isMarkdownFile, getMetadata } from './utils';
-import { DEFAULT_SETTINGS } from './settings';
+import { normalizeSettings } from './settings';
 import exportFolder from './components/folder/exportFolder';
 import { createSettingConfig } from './formConfig';
 import { SettingRenderer } from './SettingRenderer';
@@ -168,10 +168,11 @@ export default class ExportImagePlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() as ISettings) };
+    this.settings = normalizeSettings(await this.loadData());
   }
 
   async saveSettings() {
+    this.settings = normalizeSettings(this.settings);
     await this.saveData(this.settings);
   }
 }

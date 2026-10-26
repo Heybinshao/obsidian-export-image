@@ -1,7 +1,6 @@
 import type { App } from 'obsidian';
 import L from 'src/L';
-import { formatAvailable } from 'src/settings';
-import { delay } from './utils';
+import { formatAvailable, formatReady } from 'src/settings';
 
 // 从 type.d.ts 中引入类型
 type FileFormat = 'png0' | 'png1' | 'jpg' | 'webp' | 'pdf';
@@ -20,7 +19,7 @@ export interface SettingItem<T = any> {
 }
 
 export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
-  await delay(50);
+  await formatReady;
   return [
     {
       id: 'width',
