@@ -11,7 +11,10 @@
 - 2026-10-27：M1 第一轮完成。新增 `renderHost`（attached host、字体/图片/异步/Pele 等待、`.pele-zoom` 清理）；`exportImage`/`makeHTML` 改为在导出宽度下 canonical 渲染；设置深合并 + 旧 `2x` 迁移；格式探测校验 `blob.type`；split 空结果回退单页。`pnpm build` 与 `tsc` 通过。
 - 2026-10-27：M2 性能第一轮完成。`@font-face` 只嵌入导出子树实际用到的 family/weight；桌面端 `local()` 命中时跳过 32MB base64；split/PDF 改为整篇渲染一次后裁页，超过 canvas 面积预算才回退逐页。新增 4 个测试文件、11 个测试，全绿。
 - 2026-10-27：M2 保真补充。内嵌图片通过 `vault.resolveFileUrl` 找回原文件并转 data URL，避免 2x/3x 放大显示分辨率图；PDF 改用 PNG 入页；CI 改 pnpm + 单一 lockfile。新增图片 hydrate 测试，12 个测试全绿。
-- 待真机验收：用 `fixtures/vault` 在 Obsidian 1.15.0 上导出 11 篇 fixture；重点看 Pele 图宽/字号、文件夹导出、callout、长文、split。
+- 2026-10-27：交互与移动端。修复 `.user-info-container` 的 `alignitems` 拼写错误，头像/名称（含 remark）统一垂直居中；默认边距改 20；导出弹窗设置 400ms 防抖持久化；手机端按 16M px 预算自动降 scale，保存优先走 Media/分享面板，失败回退 vault。
+- 2026-10-27：测试库已删除（移入 系统废纸篓），Obsidian 已切到 `自用主库`；新插件已覆盖安装，旧版备份在 `~/workspace/archive/<月份>/主库插件旧版备份目录-20261027`。
+- 2026-10-27：新增 `docs/iteration-directions.md`，记录 P0/P1/P2 迭代方向。
+- 待真机验收：在 `自用主库` 里选一篇含 Pele/图片/callout 的笔记导出；重点看 Pele 图宽/字号、头像名称对齐、20px 边距、设置是否在重启后保留。
 
 ## 0. 结论
 
