@@ -2,8 +2,9 @@ import {
   type App,
   MarkdownRenderChild,
   MarkdownRenderer,
+  type TFile,
 } from 'obsidian';
-import { delay, waitForAsyncRenderers } from '.';
+import { delay, fileToBase64, waitForAsyncRenderers } from '.';
 
 type PeleLike = {
   mount?: (el: HTMLElement, text: string, options?: Record<string, unknown>) => unknown;
@@ -43,6 +44,59 @@ export async function waitForImages(root: HTMLElement, timeoutMs = 3000): Promis
     image.addEventListener('error', done, { once: true });
     setTimeout(done, timeoutMs);
   })));
+}
+
+function imageMime(file: TFile): string {
+  const extension = file.extension.toLowerCase();
+  if (extension === 'svg') return 'image/svg+xml';
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+  if (extension === 'webp') return 'image/webp';
+  if (extension === 'gif') return 'image/gif';
+  if (extension === 'avif') return 'image/avif';
+  return 'image/png';
+}
+
+/**
+ * Replace vault image URLs with data URLs of the original file. Obsidian's
+ * rendered <img> points at a display-size resource (and often a low-res
+ * `?width=` variant), so dom-to-image upscales it at 2x/3x and the result is
+ * blurry. Reading the vault binary keeps the original pixels; the existing
+ * width/height attributes still control the displayed size.
+ */
+export async function hydrateImages(
+  root: HTMLElement,
+  app: App,
+  sourcePath: string,
+): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(images.map(async image => {
+    const src = image.getAttribute('src') || '';
+    if (!src || src.startsWith('data:') || src.startsWith('http')) return;
+
+    let file: TFile | null = null;
+    try {
+      const vault = app.vault as unknown as {
+        resolveFileUrl?: (url: string) => TFile | null;
+      };
+      file = vault.resolveFileUrl?.(src) ?? null;
+    } catch {
+      file = null;
+    }
+
+    if (!file && image.alt) {
+      file = app.metadataCache.getFirstLinkpathDest(image.alt, sourcePath);
+    }
+    if (!file) return;
+
+    try {
+      const buffer = await app.vault.readBinary(file);
+      const blob = new Blob([buffer], { type: imageMime(file) });
+      image.src = await fileToBase64(blob);
+      image.setAttribute('data-export-image-original', 'true');
+    } catch (error) {
+      console.error('export-image: failed to read original image', file.path, error);
+    }
+  }));
 }
 
 /**
@@ -147,6 +201,7 @@ export async function renderMarkdownHost(
     );
 
     await waitForAsyncRenderers(host, 300, 5000);
+    await hydrateImages(host, app, sourcePath);
     await waitForPele(host, markdown, width);
     await waitForFonts();
     await waitForImages(host);

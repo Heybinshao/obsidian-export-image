@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   extractMermaidSources,
   getContentWidth,
+  hydrateImages,
   renderMarkdownHost,
   stripPeleChrome,
 } from '../src/utils/renderHost';
@@ -59,5 +60,23 @@ describe('renderHost', () => {
     expect(host.querySelector('.pele-zoom')).toBeNull();
 
     host.remove();
+  });
+
+  it('replaces a vault image URL with the original file data URL', async () => {
+    const image = document.createElement('img');
+    image.src = 'file:///vault/assets/diagram.svg?123';
+    document.body.appendChild(image);
+
+    const app = {
+      vault: {
+        resolveFileUrl: () => ({ path: 'assets/diagram.svg', extension: 'svg' }),
+        readBinary: async () => new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>').buffer,
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    };
+
+    await hydrateImages(document.body, app as never, 'note.md');
+    expect(image.src.startsWith('data:image/svg+xml;base64,')).toBe(true);
+    expect(image.getAttribute('data-export-image-original')).toBe('true');
   });
 });
