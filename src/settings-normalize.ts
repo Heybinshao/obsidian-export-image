@@ -6,13 +6,15 @@ export const DEFAULT_SETTINGS: ISettings = {
   resolutionMode: '3x' as ResolutionMode,
   format: 'png0',
   showMetadata: false,
+  stripNoteInfo: false,
+  tableForceWrap: false,
   recursive: false,
   quickExportSelection: false,
   padding: {
-    top: 20,
-    right: 20,
-    bottom: 20,
-    left: 20,
+    top: 50,
+    right: 50,
+    bottom: 50,
+    left: 50,
   },
   authorInfo: {
     show: false,
@@ -116,6 +118,8 @@ export function normalizeSettings(raw: unknown): ISettings {
     x: clampNumber(merged.watermark?.x, 1, 5000, DEFAULT_SETTINGS.watermark.x ?? 100),
     y: clampNumber(merged.watermark?.y, 1, 5000, DEFAULT_SETTINGS.watermark.y ?? 100),
   };
+  merged.stripNoteInfo = merged.stripNoteInfo === true;
+  merged.tableForceWrap = merged.tableForceWrap === true;
 
   return merged;
 }

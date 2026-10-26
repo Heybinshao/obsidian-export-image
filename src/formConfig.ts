@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import L from 'src/L';
 import { formatAvailable, formatReady } from 'src/settings';
+import { type SettingGroupId, groupForPath } from 'src/settingGroups';
 
 // 从 type.d.ts 中引入类型
 type FileFormat = 'png0' | 'png1' | 'jpg' | 'webp' | 'pdf';
@@ -10,6 +11,7 @@ export interface SettingItem<T = any> {
   label: string;
   description?: string;
   type: 'text' | 'number' | 'toggle' | 'dropdown' | 'color' | 'file';
+  group?: SettingGroupId;
   defaultValue?: T;
   placeholder?: string;
   options?: Array<{ value: string; text: string }>;
@@ -20,7 +22,7 @@ export interface SettingItem<T = any> {
 
 export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
   await formatReady;
-  return [
+  const items: SettingItem[] = [
     {
       id: 'width',
       label: L.setting.imageWidth.label(),
@@ -33,28 +35,34 @@ export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
       label: L.setting.padding.top(),
       description: L.setting.padding.description(),
       type: 'number',
-      placeholder: '20',
+      placeholder: '50',
     },
     {
       id: 'padding.right',
       label: L.setting.padding.right(),
       description: L.setting.padding.description(),
       type: 'number',
-      placeholder: '20',
+      placeholder: '50',
     },
     {
       id: 'padding.bottom',
       label: L.setting.padding.bottom(),
       description: L.setting.padding.description(),
       type: 'number',
-      placeholder: '20',
+      placeholder: '50',
     },
     {
       id: 'padding.left',
       label: L.setting.padding.left(),
       description: L.setting.padding.description(),
       type: 'number',
-      placeholder: '20',
+      placeholder: '50',
+    },
+    {
+      id: 'tableForceWrap',
+      label: '强制表格换行',
+      description: '关闭时保留主题的表格横向滚动；开启后按导出宽度固定列宽并强制换行。',
+      type: 'toggle',
     },
     {
       id: 'split.mode',
@@ -85,15 +93,23 @@ export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
       show: (settings) => settings.split.mode === 'fixed',
     },
     {
+      id: 'stripNoteInfo',
+      label: '剔除笔记信息',
+      description: '开启后不导出文件名与笔记属性，优先于下面的显示开关。',
+      type: 'toggle',
+    },
+    {
       id: 'showFilename',
       label: L.setting.filename.label(),
       description: L.setting.filename.description(),
       type: 'toggle',
+      show: (settings) => !settings.stripNoteInfo,
     },
     {
       id: 'showMetadata',
       label: L.setting.metadata.label(),
       type: 'toggle',
+      show: (settings) => !settings.stripNoteInfo,
     },
     {
       id: 'resolutionMode',
@@ -118,7 +134,7 @@ export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
         { value: 'jpg', text: L.setting.format.jpg() },
         { value: 'webp', text: '.webp' },
         { value: 'pdf', text: L.setting.format.pdf() },
-      ].filter(({ value }) => formatAvailable.contains(value as FileFormat)),
+      ].filter(({ value }) => formatAvailable.includes(value as FileFormat)),
     },
     {
       id: 'quickExportSelection',
@@ -257,4 +273,5 @@ export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
       show: (settings) => settings.watermark.enable,
     },
   ];
+  return items.map(item => ({ ...item, group: groupForPath(item.id) }));
 };

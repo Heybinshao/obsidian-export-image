@@ -35,7 +35,7 @@ const zh = {
     },
     padding: {
       title: '图片边框',
-      description: '设置导出图片的内边距，所有边的默认值为20px。',
+      description: '设置导出图片的内边距，所有边的默认值为50px。',
       top: '上边距',
       right: '右边距',
       bottom: '下边距',

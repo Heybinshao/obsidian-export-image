@@ -7,6 +7,8 @@ declare type ISettings = {
   resolutionMode: ResolutionMode;
   format: FileFormat;
   showMetadata: boolean;
+  stripNoteInfo?: boolean;
+  tableForceWrap?: boolean;
   recursive: boolean;
   quickExportSelection: boolean;
   padding: {
@@ -56,6 +58,7 @@ type BaseFieldSchema<T> = {
   label: string;
   path: string;
   type: ValueType;
+  group?: string;
   when?: ConditionType<T>;
   desc?: string;
 };
@@ -63,6 +66,7 @@ type SelectFieldSchema<T> = {
   label: string;
   path: string;
   type: 'select';
+  group?: string;
   options: Array<{ text: string; value: string }>;
   when?: ConditionType<T>;
   desc?: string;

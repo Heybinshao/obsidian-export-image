@@ -5,6 +5,7 @@ import {
   Modal,
 } from 'obsidian';
 import type { SettingItem } from './formConfig';
+import { SETTING_GROUPS, groupRank } from './settingGroups';
 import L from './L';
 import { delay, fileToBase64 } from './utils';
 import ImageSelectModal from './components/common/imageSelectModal';
@@ -64,10 +65,21 @@ export class SettingRenderer {
       },
     });
 
-    // 使用配置渲染设置项
-    this.settingItems.forEach(item => {
-      if (item.show && !item.show(this.plugin.settings)) {
-        return;
+    // 使用配置渲染设置项：先按分组排序，再渲染分组标题
+    const visibleItems = this.settingItems
+      .filter(item => !item.show || item.show(this.plugin.settings))
+      .sort((a, b) => groupRank(a.group) - groupRank(b.group));
+    let lastGroup: string | undefined;
+
+    visibleItems.forEach(item => {
+      if (item.group && item.group !== lastGroup) {
+        const group = SETTING_GROUPS.find(entry => entry.id === item.group);
+        if (group) {
+          const header = this.containerEl.createDiv({ cls: 'export-image-setting-group' });
+          header.createEl('h4', { text: group.title });
+          header.createEl('p', { text: group.description });
+        }
+        lastGroup = item.group;
       }
 
       const setting = new Setting(this.containerEl)

@@ -8,12 +8,20 @@ import { copy, save, saveAll } from '../../utils/capture';
 import L from '../../L';
 import Target, { type TargetRef } from '../common/Target';
 import FormItems from '../common/form/FormItems';
+import { groupForPath } from 'src/settingGroups';
 
 const formSchema: FormSchema<ISettings> = [
+  {
+    label: '剔除笔记信息',
+    path: 'stripNoteInfo',
+    type: 'boolean',
+    desc: '开启后不导出文件名与笔记属性。',
+  },
   {
     label: L.includingFilename(),
     path: 'showFilename',
     type: 'boolean',
+    when: settings => !settings.stripNoteInfo,
   },
   {
     label: L.imageWidth(),
@@ -40,6 +48,12 @@ const formSchema: FormSchema<ISettings> = [
     path: 'padding.left',
     label: L.setting.padding.left(),
     type: 'number',
+  },
+  {
+    label: '强制表格换行',
+    path: 'tableForceWrap',
+    type: 'boolean',
+    desc: '关闭时保留主题的表格横向滚动；开启后按导出宽度固定列宽并强制换行。',
   },
   {
     path: 'split.mode',
@@ -188,6 +202,10 @@ const ModalContent: FC<{
   metadataMap: Record<string, { type: MetadataType }>;
   onSettingsChange?: (settings: ISettings) => void;
 }> = ({ markdownEl, settings, app, frontmatter, title, metadataMap, onSettingsChange }) => {
+  const groupedFormSchema: FormSchema<ISettings> = formSchema.map(field => ({
+    ...field,
+    group: groupForPath(field.path),
+  }));
   const [formData, setFormData] = useState<ISettings>(settings);
   const persistedRef = useRef(JSON.stringify(settings));
   const [isGrabbing, setIsGrabbing] = useState(false);
@@ -365,7 +383,7 @@ const ModalContent: FC<{
       <div className='export-image-preview-main'>
         <div className='export-image-preview-left'>
           <FormItems
-            formSchema={formSchema}
+            formSchema={groupedFormSchema}
             update={setFormData}
             settings={formData}
             app={app}

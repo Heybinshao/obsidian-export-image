@@ -1,9 +1,9 @@
 {
   "name": "binshao-export-image",
-  "version": "2.4.5",
+  "version": "2.4.6",
   "description": "Fork of zhouhua/obsidian-export-image for Obsidian 1.15+ / Pele, with export pipeline, mobile and settings fixes.",
   "main": "main.js",
-  "author": "binshao",
+  "author": "",
   "homepage": "https://binshao.top",
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -16,7 +16,6 @@
     "lint-fix": "xo --fix"
   },
   "keywords": [],
-  "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.15.1",
   "devDependencies": {

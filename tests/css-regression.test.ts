@@ -20,7 +20,14 @@ describe('CSS regressions', () => {
     expect(css).toMatch(/\.user-info-avatar img\s*\{[^}]*border-radius:\s*50%/s);
   });
 
-  it('keeps the requested 20px default padding', () => {
-    expect(DEFAULT_SETTINGS.padding).toEqual({ top: 20, right: 20, bottom: 20, left: 20 });
+  it('keeps the requested 50px default padding', () => {
+    expect(DEFAULT_SETTINGS.padding).toEqual({ top: 50, right: 50, bottom: 50, left: 50 });
+    expect(DEFAULT_SETTINGS.stripNoteInfo).toBe(false);
+    expect(DEFAULT_SETTINGS.tableForceWrap).toBe(false);
+  });
+
+  it('only forces table wrapping when the opt-in class is present', () => {
+    expect(css).toMatch(/\.export-image-root\.export-image-table-force-wrap table\s*\{[^}]*table-layout:\s*fixed/s);
+    expect(css).toMatch(/\.export-image-root\.export-image-table-force-wrap th[\s\S]*white-space:\s*normal/s);
   });
 });

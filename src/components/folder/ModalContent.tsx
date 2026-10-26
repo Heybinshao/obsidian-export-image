@@ -10,6 +10,7 @@ import L from 'src/L';
 import { delay, isMarkdownFile } from 'src/utils';
 import { saveMultipleFiles } from 'src/utils/capture';
 import { formatAvailable, formatReady } from 'src/settings';
+import { groupForPath } from 'src/settingGroups';
 import FormItems from '../common/form/FormItems';
 
 const ModalContent: FC<{
@@ -77,6 +78,12 @@ const ModalContent: FC<{
   ]);
   const formSchema: FormSchema<ISettings> = [
     {
+      label: '剔除笔记信息',
+      path: 'stripNoteInfo',
+      type: 'boolean',
+      desc: '开启后不导出文件名与笔记属性。',
+    },
+    {
       label: L.setting.recursive(),
       path: 'recursive',
       type: 'boolean',
@@ -85,11 +92,18 @@ const ModalContent: FC<{
       label: L.includingFilename(),
       path: 'showFilename',
       type: 'boolean',
+      when: settings => !settings.stripNoteInfo,
     },
     {
       label: L.imageWidth(),
       path: 'width',
       type: 'number',
+    },
+    {
+      label: '强制表格换行',
+      path: 'tableForceWrap',
+      type: 'boolean',
+      desc: '关闭时保留主题的表格横向滚动；开启后按导出宽度固定列宽并强制换行。',
     },
     {
       label: L.setting.userInfo.show(),
@@ -114,6 +128,10 @@ const ModalContent: FC<{
       ].filter(({ value }) => formats.includes(value as FileFormat)),
     },
   ];
+  const groupedFormSchema: FormSchema<ISettings> = formSchema.map(field => ({
+    ...field,
+    group: groupForPath(field.path),
+  }));
   useEffect(() => {
     const fileList: TFile[] = [];
     if (formData.recursive) {
@@ -169,7 +187,7 @@ const ModalContent: FC<{
         <div className='export-image-preview-main'>
           <div className='export-image-preview-left'>
             <FormItems
-              formSchema={formSchema}
+              formSchema={groupedFormSchema}
               update={setFormData}
               settings={formData}
               app={app}

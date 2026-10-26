@@ -20,8 +20,8 @@ describe('renderHost', () => {
   it('subtracts horizontal padding from the export width', () => {
     expect(getContentWidth({
       width: 640,
-      padding: { top: 20, right: 20, bottom: 20, left: 20 },
-    } as never)).toBe(600);
+      padding: { top: 50, right: 50, bottom: 50, left: 50 },
+    } as never)).toBe(540);
   });
 
   it('extracts mermaid fences in order', () => {

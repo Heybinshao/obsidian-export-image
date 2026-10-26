@@ -12,7 +12,7 @@ describe('normalizeSettings', () => {
     });
 
     expect(settings.resolutionMode).toBe('2x');
-    expect(settings.padding).toEqual({ top: 20, right: 20, bottom: 20, left: 20 });
+    expect(settings.padding).toEqual({ top: 50, right: 50, bottom: 50, left: 50 });
     expect(settings.watermark.opacity).toBe(0.2);
     expect(settings.watermark.width).toBe(120);
     expect(settings.split.height).toBe(1000);
@@ -27,7 +27,7 @@ describe('normalizeSettings', () => {
     });
 
     expect(settings.width).toBe(20);
-    expect(settings.padding).toEqual({ top: 20, right: 20, bottom: 20, left: 20 });
+    expect(settings.padding).toEqual({ top: 50, right: 50, bottom: 50, left: 50 });
     expect(settings.split.mode).toBe('none');
     expect(settings.split.height).toBe(50);
     expect(settings.split.overlap).toBe(0);
@@ -37,5 +37,17 @@ describe('normalizeSettings', () => {
   it('does not let a legacy 2x key override an explicit resolutionMode', () => {
     const settings = normalizeSettings({ '2x': true, resolutionMode: '4x' });
     expect(settings.resolutionMode).toBe('4x');
+  });
+
+  it('defaults the new content and table switches to off', () => {
+    const settings = normalizeSettings({});
+    expect(settings.stripNoteInfo).toBe(false);
+    expect(settings.tableForceWrap).toBe(false);
+  });
+
+  it('does not treat a truthy string as an enabled switch', () => {
+    const settings = normalizeSettings({ stripNoteInfo: 'true', tableForceWrap: 'yes' });
+    expect(settings.stripNoteInfo).toBe(false);
+    expect(settings.tableForceWrap).toBe(false);
   });
 });

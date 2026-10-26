@@ -16,7 +16,8 @@
 - 2026-10-27：新增 `docs/iteration-directions.md`，记录 P0/P1/P2 迭代方向。
 - 2026-10-27：按 binshao 插件命名规范改为 `「binshao」Export Image`（author=binshao，authorUrl=binshao.top，中文描述）；README 顶部加 fork 声明，新增 NOTICE，LICENSE 保留原作者并追加 fork 版权；设置页改为「Fork by binshao + 原项目」双链接。插件 id 暂保留 `obsidian-export-image`，避免现有 `data.json` 失效。
 - 2026-10-27：修复设置页头像预览：`.user-info-avatar img` 改为 absolute + inset 0 + object-fit cover + 50% radius，删除按钮 z-index 提升；补 CSS 回归测试和头像视觉 harness。当前 5 个测试文件 / 16 个测试全绿。
-- 待真机验收：在 `自用主库` 里选一篇含 Pele/图片/callout 的笔记导出；重点看 Pele 图宽/字号、头像名称对齐、20px 边距、设置是否在重启后保留。
+- 2026-10-27：导出设置重构（v2.4.6）。新增「强制表格换行」「剔除笔记信息」；边距默认 50；设置页与导出弹窗按 7 组渲染（基础输出/版式与边距/内容信息/表格/长图分割/作者信息/水印）；`stripNoteInfo` 与 `tableForceWrap` 均为纯 CSS/条件渲染，不重渲染正文。新增 `docs/settings-layout.md`，当前 6 个测试文件 / 22 个测试全绿。
+- 待真机验收：在 `自用主库` 里选一篇含 Pele/图片/callout 的笔记导出；重点看 Pele 图宽/字号、头像名称对齐、50px 边距、设置是否在重启后保留。
 
 ## 0. 结论
 

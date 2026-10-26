@@ -163,10 +163,18 @@ const Target = forwardRef<
     })();
   }, [setting]);
 
+  const hideNoteInfo = setting.stripNoteInfo === true;
+  const showFilename = setting.showFilename && !hideNoteInfo;
+  const showMetadata = setting.showMetadata && !hideNoteInfo;
+
   return (
     <div ref={clipRef}>
       <div
-        className={clsx('export-image-root markdown-reading-view', frontmatter?.cssclasses || frontmatter?.cssclass)}
+        className={clsx(
+          'export-image-root markdown-reading-view',
+          frontmatter?.cssclasses || frontmatter?.cssclass,
+          { 'export-image-table-force-wrap': setting.tableForceWrap },
+        )}
         ref={rootRef}
         style={{
           display: 'flex',
@@ -188,12 +196,12 @@ const Target = forwardRef<
               padding: `${setting.padding.top}px ${setting.padding.right}px ${setting.padding.bottom}px ${setting.padding.left}px`,
             }}
           >
-            {setting.showFilename && (
+            {showFilename && (
               <div className='inline-title' autoCapitalize='on'>
                 {title}
               </div>
             )}
-            {setting.showMetadata
+            {showMetadata
               && frontmatter
               && Object.keys(frontmatter).length > 0 && (
                 <div className='metadata-container' style={{ display: 'block' }}>

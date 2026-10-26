@@ -224,6 +224,47 @@ If your plugin does not need CSS, delete this file.
   border-radius: 8px;
 }
 
+.export-image-setting-group {
+  margin: 24px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.export-image-setting-group h4 {
+  margin: 0;
+  font-size: 15px;
+}
+.export-image-setting-group p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.export-image-form-group {
+  margin: 18px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.export-image-form-group h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.export-image-form-group p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* 默认关闭：不覆盖主题的表格横向滚动；开启后按导出宽度强制换行 */
+.export-image-root.export-image-table-force-wrap table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+.export-image-root.export-image-table-force-wrap th,
+.export-image-root.export-image-table-force-wrap td {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .export-image-progress-bar {
   max-width: 320px;
   width: 100%;
