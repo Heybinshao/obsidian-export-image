@@ -14,6 +14,7 @@
 - 2026-10-27：交互与移动端。修复 `.user-info-container` 的 `alignitems` 拼写错误，头像/名称（含 remark）统一垂直居中；默认边距改 20；导出弹窗设置 400ms 防抖持久化；手机端按 16M px 预算自动降 scale，保存优先走 Media/分享面板，失败回退 vault。
 - 2026-10-27：测试库已删除（移入 系统废纸篓），Obsidian 已切到 `自用主库`；新插件已覆盖安装，旧版备份在 `~/workspace/archive/<月份>/主库插件旧版备份目录-20261027`。
 - 2026-10-27：新增 `docs/iteration-directions.md`，记录 P0/P1/P2 迭代方向。
+- 2026-10-27：按 binshao 插件命名规范改为 `「binshao」Export Image`（author=binshao，authorUrl=binshao.top，中文描述）；README 顶部加 fork 声明，新增 NOTICE，LICENSE 保留原作者并追加 fork 版权；设置页改为「Fork by binshao + 原项目」双链接。插件 id 暂保留 `obsidian-export-image`，避免现有 `data.json` 失效。
 - 待真机验收：在 `自用主库` 里选一篇含 Pele/图片/callout 的笔记导出；重点看 Pele 图宽/字号、头像名称对齐、20px 边距、设置是否在重启后保留。
 
 ## 0. 结论
