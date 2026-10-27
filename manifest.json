@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-export-image",
 	"name": "「binshao」Export Image",
-	"version": "2.4.6",
+	"version": "2.5.2",
 	"minAppVersion": "1.4.0",
 	"description": "把笔记导出为图片。基于 zhouhua/obsidian-export-image 的 fork，适配 Obsidian 1.15+ / Pele，修复移动端与导出管线。",
 	"author": "binshao",
