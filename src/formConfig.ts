@@ -31,6 +31,17 @@ export const createSettingConfig = async (app: App): Promise<SettingItem[]> => {
       placeholder: '640',
     },
     {
+      id: 'themeMode',
+      label: '导出主题',
+      description: '跟随主题随 Obsidian 当前外观；浅色 / 深色强制导出图使用固定配色。',
+      type: 'dropdown',
+      options: [
+        { value: 'follow', text: '跟随主题' },
+        { value: 'light', text: '浅色' },
+        { value: 'dark', text: '深色' },
+      ],
+    },
+    {
       id: 'padding.top',
       label: L.setting.padding.top(),
       description: L.setting.padding.description(),

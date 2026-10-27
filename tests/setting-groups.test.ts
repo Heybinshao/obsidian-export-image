@@ -5,6 +5,7 @@ describe('setting groups', () => {
   it('keeps the planned group order', () => {
     expect(SETTING_GROUPS.map(group => group.id)).toEqual([
       'output',
+      'theme',
       'layout',
       'content',
       'table',
@@ -16,6 +17,7 @@ describe('setting groups', () => {
 
   it('maps settings to the right group', () => {
     expect(groupForPath('width')).toBe('output');
+    expect(groupForPath('themeMode')).toBe('theme');
     expect(groupForPath('padding.top')).toBe('layout');
     expect(groupForPath('stripNoteInfo')).toBe('content');
     expect(groupForPath('showMetadata')).toBe('content');
@@ -26,7 +28,8 @@ describe('setting groups', () => {
   });
 
   it('sorts groups in display order', () => {
-    expect(groupRank('output')).toBeLessThan(groupRank('layout'));
+    expect(groupRank('output')).toBeLessThan(groupRank('theme'));
+    expect(groupRank('theme')).toBeLessThan(groupRank('layout'));
     expect(groupRank('layout')).toBeLessThan(groupRank('content'));
     expect(groupRank('content')).toBeLessThan(groupRank('table'));
     expect(groupRank('table')).toBeLessThan(groupRank('split'));

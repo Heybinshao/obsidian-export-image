@@ -26,6 +26,9 @@
     // Desktop Obsidian usually has the user's font installed; embedding a
     // 32 MB base64 WOFF2 into every SVG is pure waste there.
     skipLocalFonts: false,
+    // Extra @font-face CSS (e.g. read from vault snippets when the browser
+    // hides cross-origin stylesheet rules) appended to the embedded fonts.
+    extraFontCss: '',
   };
 
   const domtoimage = {
@@ -276,6 +279,8 @@
     domtoimage.impl.options.styleCaching = options.styleCaching === undefined ? defaultOptions.styleCaching : options.styleCaching;
 
     domtoimage.impl.options.skipLocalFonts = options.skipLocalFonts === undefined ? defaultOptions.skipLocalFonts : options.skipLocalFonts;
+
+    domtoimage.impl.options.extraFontCss = options.extraFontCss === undefined ? defaultOptions.extraFontCss : options.extraFontCss;
 
     domtoimage.impl.options.requestUrl = options.requestUrl;
     domtoimage.impl.options.type = options.type || 'image/png';
@@ -1114,7 +1119,11 @@
         .then(webFonts => Promise.all(
           webFonts.map(webFont => webFont.resolve()),
         ))
-        .then(cssStrings => cssStrings.join('\n'));
+        .then(cssStrings => {
+          const extra = domtoimage.impl.options.extraFontCss;
+          if (extra) cssStrings.push(extra);
+          return cssStrings.join('\n');
+        });
     }
 
     function collectUsedFonts(node) {

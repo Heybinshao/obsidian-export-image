@@ -14,7 +14,9 @@ This Obsidian plugin can easily help you export any article as an image.
 - 内嵌图片读取 vault 原图，避免 2x/3x 放大显示分辨率图。
 - split/PDF 单次栅格化后裁页；移动端按 canvas 面积预算自动降 scale。
 - 导出弹窗设置持久化；头像/名称（含备注）垂直居中。
-- 默认边距 20px。
+- 默认边距 50px。
+- 导出主题可选「跟随主题 / 浅色 / 深色」：强制配色只作用于导出图，App 界面不变色。
+- 头像选图时自动压缩到长边 256px（WebP），`data.json` 不再保存原图。
 
 
 ## Features

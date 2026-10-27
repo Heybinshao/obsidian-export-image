@@ -78,6 +78,7 @@ const ImageSelect: FC<{
               <div
                 key={file.path}
                 title={file.path}
+                className='export-image-select-item'
                 onClick={() => {
                   setSelected(file);
                 }}
@@ -88,7 +89,11 @@ const ImageSelect: FC<{
                       : 'transparent',
                 }}
               >
-                {file.path}
+                <div
+                  className='export-image-select-thumb'
+                  style={{ backgroundImage: `url("${app.vault.getResourcePath(file)}")` }}
+                ></div>
+                <span>{file.path}</span>
               </div>
             ))
           ) : (

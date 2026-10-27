@@ -78,6 +78,17 @@ const ModalContent: FC<{
   ]);
   const formSchema: FormSchema<ISettings> = [
     {
+      label: '导出主题',
+      path: 'themeMode',
+      type: 'select',
+      desc: '跟随主题随 Obsidian 当前外观；浅色 / 深色强制导出图使用固定配色。',
+      options: [
+        { text: '跟随主题', value: 'follow' },
+        { text: '浅色', value: 'light' },
+        { text: '深色', value: 'dark' },
+      ],
+    },
+    {
       label: '剔除笔记信息',
       path: 'stripNoteInfo',
       type: 'boolean',

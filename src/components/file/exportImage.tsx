@@ -16,6 +16,7 @@ import { preprocessMarkdown } from 'src/utils/preprocessMarkdown';
 import Target from '../common/Target';
 import { copy } from 'src/utils/capture';
 import { getContentWidth, renderMarkdownHost } from 'src/utils/renderHost';
+import { isPhoneApp } from 'src/utils/platform';
 
 export default async function (
   app: App,
@@ -64,7 +65,7 @@ export default async function (
     try {
       const target = div.querySelector<HTMLElement>('.export-image-root');
       if (!target) throw new Error('export-image-root was not rendered');
-      await copy(target, settings.resolutionMode, settings.format);
+      await copy(app, target, settings.resolutionMode, settings.format);
     } catch (error) {
       console.error(error);
       new Notice(L.copyFail());
@@ -78,8 +79,12 @@ export default async function (
 
   const modal = new Modal(app);
   modal.setTitle(L.imageExportPreview());
-  modal.modalEl.style.width = '85vw';
-  modal.modalEl.style.maxWidth = '1500px';
+  modal.modalEl.addClass('export-image-modal');
+  modal.modalEl.addClass('export-image-file-modal');
+  modal.modalEl.style.width = isPhoneApp() ? '100%' : '85vw';
+  if (!isPhoneApp()) {
+    modal.modalEl.style.maxWidth = '1500px';
+  }
   modal.open();
 
   let host: HTMLDivElement | undefined;

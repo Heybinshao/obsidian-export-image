@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: ISettings = {
   showMetadata: false,
   stripNoteInfo: false,
   tableForceWrap: false,
+  themeMode: 'follow' as ThemeMode,
   recursive: false,
   quickExportSelection: false,
   padding: {
@@ -95,6 +96,9 @@ export function normalizeSettings(raw: unknown): ISettings {
   }
   if (!['none', 'fixed', 'hr', 'auto'].includes(merged.split.mode)) {
     merged.split.mode = 'none';
+  }
+  if (!['follow', 'light', 'dark'].includes(merged.themeMode as string)) {
+    merged.themeMode = 'follow';
   }
 
   merged.width = clampNumber(merged.width, 20, 4000, DEFAULT_SETTINGS.width ?? 640);

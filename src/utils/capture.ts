@@ -1,5 +1,5 @@
 import {
-  Notice, Platform, requestUrl, type App, type TFile,
+  Notice, requestUrl, type App, type TFile,
 } from 'obsidian';
 import { inlineCalloutIconsDynamic } from './calloutIcons';
 import saveAs from 'file-saver';
@@ -11,15 +11,41 @@ import makeHTML from './makeHTML';
 import { fileToBase64, getMime } from '.';
 import { nextFrame, waitForFonts } from './renderHost';
 import { calculateSplitPositions, getElementMeasures } from './split';
+import { collectMissingFontCss, collectUsedFontFamilies, ensureFontsLoaded, getFontDiagnostics, summarizeDocumentFonts } from './fontSources';
+import { debugFlush, debugReset, debugSet } from './exportDebug';
+import { isMobileApp } from './platform';
 
-async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: string): Promise<Blob> {
+export class ExportCancelledError extends Error {
+  constructor() {
+    super('export cancelled');
+    this.name = 'ExportCancelledError';
+  }
+}
+
+async function getBlob(app: App, el: HTMLElement, resolutionMode: ResolutionMode, type: string): Promise<Blob> {
   // Inline callout icons before capture (inject fallbacks if needed for export)
   await inlineCalloutIconsDynamic(el, false, true);
   await waitForFonts();
+  await ensureFontsLoaded(el);
   await nextFrame();
 
   const scale = getEffectiveScale(el, resolutionMode);
-  return domtoimage.toBlob(el, {
+  const extraFontCss = await collectMissingFontCss(app, el);
+  const mobile = isMobileApp();
+  if (mobile) {
+    debugReset({
+      families: [...collectUsedFontFamilies(el)],
+      documentFonts: summarizeDocumentFonts(),
+      fontSources: getFontDiagnostics(),
+      extraFontCssBytes: extraFontCss.length,
+      skipLocalFonts: !mobile,
+      scale,
+      width: el.clientWidth,
+      height: el.clientHeight,
+    });
+  }
+
+  const blob = await domtoimage.toBlob(el, {
     width: el.clientWidth,
     height: el.clientHeight,
     quality: 0.85,
@@ -28,8 +54,16 @@ async function getBlob(el: HTMLElement, resolutionMode: ResolutionMode, type: st
     type,
     // On desktop the user's font is usually installed locally; embedding the
     // 32 MB base64 copy into every SVG is the main export slowdown.
-    skipLocalFonts: !Platform.isMobile,
-  }) as Promise<Blob>;
+    skipLocalFonts: !mobile,
+    extraFontCss,
+  }) as Blob;
+
+  if (mobile) {
+    debugSet('blobBytes', blob.size);
+    await debugFlush(app);
+  }
+
+  return blob;
 }
 
 function getScale(resolutionMode: ResolutionMode): number {
@@ -46,14 +80,23 @@ function getEffectiveScale(el: HTMLElement, resolutionMode: ResolutionMode): num
   const area = el.clientWidth * el.clientHeight;
   if (!area) return requested;
 
-  const maxArea = Platform.isMobile ? 16_000_000 : 64_000_000;
+  const maxArea = isMobileApp() ? 16_000_000 : 64_000_000;
   const maxScale = Math.sqrt(maxArea / area);
   const effective = Math.max(1, Math.min(requested, Math.floor(maxScale * 100) / 100));
   if (effective < requested) {
     console.warn(`export-image: scale reduced from ${requested}x to ${effective}x to fit the canvas budget`);
+    // Mobile users have no console; a blurry image without explanation reads
+    // as a bug. Warn once per session.
+    if (isMobileApp() && !scaleWarningShown) {
+      scaleWarningShown = true;
+      new Notice(`图片较长，已按设备内存把清晰度降到 ${effective}x`);
+    }
   }
+
   return effective;
 }
+
+let scaleWarningShown = false;
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -64,17 +107,25 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   });
 }
 
-async function getFullCanvas(el: HTMLElement, resolutionMode: ResolutionMode): Promise<HTMLCanvasElement> {
+async function getFullCanvas(app: App, el: HTMLElement, resolutionMode: ResolutionMode): Promise<HTMLCanvasElement> {
   await inlineCalloutIconsDynamic(el, false, true);
   await waitForFonts();
+  await ensureFontsLoaded(el);
   await nextFrame();
+
+  const extraFontCss = await collectMissingFontCss(app, el);
+  if (isMobileApp()) {
+    debugSet('fontSources', getFontDiagnostics());
+    debugSet('splitExtraFontCssBytes', extraFontCss.length);
+  }
 
   return domtoimage.toCanvas(el, {
     width: el.clientWidth,
     height: el.clientHeight,
     scale: getEffectiveScale(el, resolutionMode),
     requestUrl,
-    skipLocalFonts: !Platform.isMobile,
+    skipLocalFonts: !isMobileApp(),
+    extraFontCss,
   }) as Promise<HTMLCanvasElement>;
 }
 
@@ -97,48 +148,80 @@ async function makePdf(blob: Blob, el: HTMLElement) {
   return pdf;
 }
 
-async function saveToVault(app: App, blob: Blob, filename: string) {
-  const filePath = await app.fileManager.getAvailablePathForAttachment(filename);
-  await app.vault.createBinary(filePath, await blob.arrayBuffer());
-  return filePath;
+type ShareResult = 'shared' | 'cancelled' | 'inactive' | 'unsupported';
+
+/** `awaiting-share` = the bitmap is ready but the tap's activation expired. */
+export type SaveOutcome = 'done' | 'awaiting-share';
+
+function toFile(blob: Blob, filename: string): File {
+  return new File([blob], filename, { type: blob.type || 'image/png' });
 }
 
-type MobileMediaPlugin = {
-  savePhoto?: (options: { base64?: string; album?: string; path?: string }) => Promise<unknown>;
-};
+/**
+ * Web Share needs a live user gesture. A 3x capture of a long note can outlast
+ * it, so when the browser reports NotAllowedError we keep the rendered files
+ * and let the dialog offer a dedicated share button — its own tap is a fresh
+ * gesture, unlike asking the user to press the export button again.
+ */
+let pendingShare: { files: File[]; title: string } | undefined;
 
-async function saveMobile(app: App, blob: Blob, filename: string): Promise<void> {
-  const capacitor = (window as unknown as {
-    Capacitor?: { Plugins?: { Media?: MobileMediaPlugin } };
-  }).Capacitor;
-  const media = capacitor?.Plugins?.Media;
+export function hasPendingShare(): boolean {
+  return Boolean(pendingShare?.files.length);
+}
 
-  if (media?.savePhoto) {
-    try {
-      await media.savePhoto({ base64: await fileToBase64(blob), album: 'Obsidian' });
-      new Notice(L.saveSuccess({ filePath: '相册' }));
-      return;
-    } catch (error) {
-      console.warn('export-image: Media.savePhoto failed, falling back to share sheet', error);
-    }
+async function shareFiles(files: File[], title: string): Promise<ShareResult> {
+  if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
+    return 'unsupported';
+  }
+  if (!navigator.canShare({ files })) {
+    return 'unsupported';
   }
 
-  const file = new File([blob], filename, { type: blob.type || 'image/png' });
-  const canShare = typeof navigator.canShare === 'function'
-    && navigator.canShare({ files: [file] });
-  if (canShare) {
-    try {
-      await navigator.share({ files: [file], title: filename });
-      new Notice('已打开分享面板，请选择“存储图像”保存到相册');
-      return;
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      console.warn('export-image: share sheet failed, falling back to vault', error);
-    }
+  try {
+    await navigator.share({ files, title });
+    return 'shared';
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') return 'cancelled';
+    if ((error as Error).name === 'NotAllowedError') return 'inactive';
+    console.warn('export-image: share sheet failed', error);
+    return 'unsupported';
   }
+}
 
-  const filePath = await saveToVault(app, blob, filename);
-  new Notice(L.saveSuccess({ filePath }));
+async function shareMobile(files: File[], title: string): Promise<SaveOutcome> {
+  const result = await shareFiles(files, title);
+  debugSet('share', { result, files: files.length, bytes: files.reduce((sum, file) => sum + file.size, 0) });
+  if (result === 'shared') {
+    pendingShare = undefined;
+    new Notice('已打开系统分享面板');
+    return 'done';
+  }
+  if (result === 'cancelled') {
+    pendingShare = undefined;
+    return 'done';
+  }
+  if (result === 'inactive') {
+    pendingShare = { files, title };
+    return 'awaiting-share';
+  }
+  pendingShare = undefined;
+  new Notice('当前环境不支持系统分享，图片没有导出');
+  return 'done';
+}
+
+/** Share the files rendered by the previous attempt, from a fresh tap. */
+export async function sharePendingFiles(): Promise<SaveOutcome> {
+  if (!pendingShare) return 'done';
+  const { files, title } = pendingShare;
+  return shareMobile(files, title);
+}
+
+export function discardPendingShare(): void {
+  pendingShare = undefined;
+}
+
+async function saveMobile(blob: Blob, filename: string, title: string): Promise<SaveOutcome> {
+  return shareMobile([toFile(blob, filename)], title);
 }
 
 export async function save(
@@ -148,12 +231,15 @@ export async function save(
   resolutionMode: ResolutionMode,
   format: FileFormat,
   isMobile: boolean,
-) {
+  shouldCancel?: () => boolean,
+): Promise<SaveOutcome> {
   const blob: Blob = await getBlob(
+    app,
     el,
     resolutionMode,
     format === 'pdf' ? 'image/png' : getMime(format),
   );
+  if (shouldCancel?.()) throw new ExportCancelledError();
   const filename = `${title.replaceAll(/\s+/g, '_')}.${format.replace(/\d$/, '')}`;
   switch (format) {
     case 'jpg':
@@ -161,32 +247,37 @@ export async function save(
     case 'png0':
     case 'png1': {
       if (isMobile) {
-        await saveMobile(app, blob, filename);
-      } else {
-        saveAs(blob, filename);
+        const outcome = await saveMobile(blob, filename, title);
+        await debugFlush(app);
+        return outcome;
       }
 
-      break;
+      saveAs(blob, filename);
+      return 'done';
     }
 
     case 'pdf': {
       const pdf = await makePdf(blob, el);
       if (isMobile) {
-        await saveMobile(
-          app,
+        const outcome = await saveMobile(
           new Blob([pdf.output('arraybuffer')], { type: 'application/pdf' }),
           filename,
+          title,
         );
-      } else {
-        pdf.save(filename);
+        await debugFlush(app);
+        return outcome;
       }
 
-      break;
+      pdf.save(filename);
+      return 'done';
     }
   }
+
+  return 'done';
 }
 
 export async function copy(
+  app: App,
   el: HTMLElement,
   resolutionMode: ResolutionMode,
   format: FileFormat,
@@ -197,6 +288,7 @@ export async function copy(
   }
 
   const blob = await getBlob(
+    app,
     el,
     resolutionMode,
     getMime(format),
@@ -283,7 +375,8 @@ export async function saveAll(
   splitMode: SplitMode,
   app: App,
   title: string,
-) {
+  shouldCancel?: () => boolean,
+): Promise<SaveOutcome> {
   try {
     // 计算需要分割的页数和位置
     const totalHeight = target.contentElement.clientHeight;
@@ -304,7 +397,7 @@ export async function saveAll(
     const scale = getEffectiveScale(target.contentElement, resolutionMode);
     const pageWidth = target.contentElement.clientWidth;
     const fullHeight = target.contentElement.clientHeight;
-    const maxArea = Platform.isMobile ? 16_000_000 : 64_000_000;
+    const maxArea = isMobileApp() ? 16_000_000 : 64_000_000;
 
     // Render the whole note once and crop pages from that bitmap. The old
     // loop re-cloned the DOM, re-embedded fonts and re-inlined images for
@@ -312,13 +405,14 @@ export async function saveAll(
     let fullCanvas: HTMLCanvasElement | undefined;
     if (pageWidth > 0 && fullHeight > 0 && pageWidth * scale * fullHeight * scale <= maxArea) {
       try {
-        fullCanvas = await getFullCanvas(target.contentElement, resolutionMode);
+        fullCanvas = await getFullCanvas(app, target.contentElement, resolutionMode);
       } catch (error) {
         console.error('export-image: full canvas failed, falling back to per-page render', error);
       }
     }
 
     const pageBlob = async (startY: number, height: number, type: string): Promise<Blob> => {
+      if (shouldCancel?.()) throw new ExportCancelledError();
       if (fullCanvas) {
         const pixelScale = fullCanvas.width / pageWidth;
         const sourceY = Math.min(
@@ -351,7 +445,7 @@ export async function saveAll(
       target.setClip(startY, height);
       await nextFrame();
       await nextFrame(); // 等待布局与字体稳定
-      return getBlob(target.element, resolutionMode, type);
+      return getBlob(app, target.element, resolutionMode, type);
     };
 
     if (format === 'pdf') {
@@ -377,43 +471,51 @@ export async function saveAll(
       }
 
       const filename = `${title.replaceAll(/\s+/g, '_')}.pdf`;
-      if (Platform.isMobile) {
-        await saveMobile(
-          app,
+      if (isMobileApp()) {
+        const outcome = await saveMobile(
           new Blob([pdf!.output('arraybuffer')], { type: 'application/pdf' }),
           filename,
+          title,
         );
-      } else {
-        pdf?.save(filename);
-      }
-    } else {
-      // 其他图片格式：分别保存每个部分
-      const ext = format.replace(/\d$/, '');
-      const zip = new JSZip();
-      const blobs: { blob: Blob; filename: string }[] = [];
-
-      for (let i = 0; i < splitPositions.length; i++) {
-        const { startY, height } = splitPositions[i];
-        const blob = await pageBlob(startY, height, getMime(format));
-        const filename = `${title.replaceAll(/\s+/g, '_')}_${i + 1}.${ext}`;
-        blobs.push({ blob, filename });
+        await debugFlush(app);
+        return outcome;
       }
 
-      if (Platform.isMobile) {
-        // 在移动端优先走相册/分享面板，失败才回退到 vault
-        for (const { blob, filename } of blobs) {
-          await saveMobile(app, blob, filename);
-          await nextFrame();
-        }
-      } else {
-        // 在桌面端创建 zip
-        for (const { blob, filename } of blobs) {
-          zip.file(filename, blob);
-        }
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        saveAs(zipBlob, `${title.replaceAll(/\s+/g, '_')}.zip`);
-      }
+      pdf?.save(filename);
+      return 'done';
     }
+
+    // 其他图片格式：分别保存每个部分
+    const ext = format.replace(/\d$/, '');
+    const zip = new JSZip();
+    const blobs: { blob: Blob; filename: string }[] = [];
+
+    for (let i = 0; i < splitPositions.length; i++) {
+      const { startY, height } = splitPositions[i];
+      const blob = await pageBlob(startY, height, getMime(format));
+      const filename = `${title.replaceAll(/\s+/g, '_')}_${i + 1}.${ext}`;
+      blobs.push({ blob, filename });
+    }
+
+    if (isMobileApp()) {
+      // One share sheet with every page attached; the user saves them to
+      // Photos/Files from there. Never write into the vault on mobile.
+      const outcome = await shareMobile(
+        blobs.map(({ blob, filename }) => toFile(blob, filename)),
+        title,
+      );
+      await debugFlush(app);
+      return outcome;
+    }
+
+    // 在桌面端创建 zip
+    for (const { blob, filename } of blobs) {
+      zip.file(filename, blob);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    saveAs(zipBlob, `${title.replaceAll(/\s+/g, '_')}.zip`);
+    return 'done';
   } finally {
     // 确保无论成功还是失败都恢复原始状态
     target.resetClip();

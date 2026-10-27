@@ -10,6 +10,7 @@ import {
 } from 'obsidian';
 import L from './L';
 import { isMarkdownFile, getMetadata } from './utils';
+import { compressAvatar } from './utils/image';
 import { normalizeSettings } from './settings';
 import exportFolder from './components/folder/exportFolder';
 import { createSettingConfig } from './formConfig';
@@ -32,6 +33,16 @@ export default class ExportImagePlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    // Mobile has no right-click menu; the ribbon is the shortest path to an export.
+    this.addRibbonIcon('image-down', '导出当前笔记为图片', () => {
+      const file = this.app.workspace.getActiveFile();
+      if (!file || !isMarkdownFile(file)) {
+        new Notice('当前没有打开的 Markdown 笔记');
+        return;
+      }
+      void this.exportFile(file);
+    });
 
     this.registerEvent(
       this.app.workspace.on('file-menu', (menu, file) => {
@@ -178,6 +189,23 @@ export default class ExportImagePlugin extends Plugin {
 
   async loadSettings() {
     this.settings = normalizeSettings(await this.loadData());
+    void this.shrinkStoredAvatar();
+  }
+
+  /**
+   * One-off migration: avatars used to be stored as the original camera image
+   * (hundreds of KB of base64 inside `data.json`, embedded into every export).
+   * Shrink whatever is already saved, then persist the smaller copy.
+   */
+  private async shrinkStoredAvatar() {
+    const avatar = this.settings.authorInfo?.avatar;
+    if (!avatar || !avatar.startsWith('data:image/')) return;
+
+    const compressed = await compressAvatar(avatar);
+    if (compressed === avatar) return;
+
+    this.settings.authorInfo.avatar = compressed;
+    await this.saveSettings();
   }
 
   async saveSettings() {

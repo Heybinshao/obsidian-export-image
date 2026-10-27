@@ -1,5 +1,6 @@
 export type SettingGroupId =
   | 'output'
+  | 'theme'
   | 'layout'
   | 'content'
   | 'table'
@@ -19,6 +20,11 @@ export const SETTING_GROUPS: SettingGroup[] = [
     id: 'output',
     title: '基础输出',
     description: '画布尺寸、清晰度、文件格式与快速导出。',
+  },
+  {
+    id: 'theme',
+    title: '主题',
+    description: '导出图使用的明暗配色；跟随主题时随 Obsidian 当前外观变化。',
   },
   {
     id: 'layout',
@@ -62,6 +68,7 @@ export function groupForPath(path: string): SettingGroupId {
   if (path.startsWith('split.')) return 'split';
   if (path.startsWith('authorInfo.')) return 'author';
   if (path.startsWith('watermark.')) return 'watermark';
+  if (path === 'themeMode') return 'theme';
   if (path === 'tableForceWrap') return 'table';
   if (['showFilename', 'showMetadata', 'stripNoteInfo'].includes(path)) return 'content';
   return 'output';

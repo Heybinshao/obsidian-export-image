@@ -1,6 +1,7 @@
 import { type App, type FrontMatterCache } from 'obsidian';
 import { inlineCalloutIconsDynamic } from 'src/utils/calloutIcons';
 import { stripPeleChrome } from 'src/utils/renderHost';
+import { applyExportTheme, clearExportTheme } from 'src/utils/themeVars';
 import React, {
   forwardRef, useEffect, useLayoutEffect, useRef, useState, useImperativeHandle, useMemo,
 } from 'react';
@@ -119,6 +120,24 @@ const Target = forwardRef<
     };
   }, [markdownEl]);
 
+  // Force the chosen light/dark palette on the export subtree. The app theme
+  // is never touched; see utils/themeVars for why the palette is replayed
+  // instead of just adding a theme class.
+  useLayoutEffect(() => {
+    const element = rootRef.current;
+    if (!element) return;
+
+    const apply = () => applyExportTheme(element, setting.themeMode);
+    apply();
+
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+    return () => {
+      observer.disconnect();
+      clearExportTheme(element);
+    };
+  }, [setting.themeMode]);
+
   useImperativeHandle(ref, () => ({
     element: clipRef.current!,
     contentElement: rootRef.current!,
@@ -173,7 +192,11 @@ const Target = forwardRef<
         className={clsx(
           'export-image-root markdown-reading-view',
           frontmatter?.cssclasses || frontmatter?.cssclass,
-          { 'export-image-table-force-wrap': setting.tableForceWrap },
+          {
+            'export-image-table-force-wrap': setting.tableForceWrap,
+            'theme-light': setting.themeMode === 'light',
+            'theme-dark': setting.themeMode === 'dark',
+          },
         )}
         ref={rootRef}
         style={{
@@ -231,6 +254,11 @@ const Target = forwardRef<
                   : 'borderTop']: '1px solid var(--background-modifier-border)',
 
                 justifyContent: alignMap[setting.authorInfo.align || 'right'],
+                // Keep the signature block inside the same text column as the
+                // note body; a fixed 32px inset drifted from the configurable
+                // content padding (default 50) and the name sat outside the
+                // text's right edge.
+                padding: `16px ${setting.padding?.right ?? 32}px 16px ${setting.padding?.left ?? 32}px`,
                 background:
                   setting.format === 'png1'
                     ? 'unset'

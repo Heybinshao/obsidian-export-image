@@ -50,4 +50,10 @@ describe('normalizeSettings', () => {
     expect(settings.stripNoteInfo).toBe(false);
     expect(settings.tableForceWrap).toBe(false);
   });
+
+  it('defaults the export theme to follow and rejects unknown values', () => {
+    expect(normalizeSettings({}).themeMode).toBe('follow');
+    expect(normalizeSettings({ themeMode: 'dark' }).themeMode).toBe('dark');
+    expect(normalizeSettings({ themeMode: 'sepia' }).themeMode).toBe('follow');
+  });
 });

@@ -1,16 +1,29 @@
-import { type App, type FrontMatterCache, Notice, Platform } from 'obsidian';
+import { type App, type FrontMatterCache, Notice } from 'obsidian';
 import React, {
-  useState, useRef, type FC, useEffect, useCallback,
+  useState, useRef, type FC, useEffect, useLayoutEffect, useCallback,
 } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { isCopiable } from 'src/imageFormatTester';
-import { copy, save, saveAll } from '../../utils/capture';
+import { copy, save, saveAll, ExportCancelledError, sharePendingFiles, discardPendingShare } from '../../utils/capture';
 import L from '../../L';
 import Target, { type TargetRef } from '../common/Target';
 import FormItems from '../common/form/FormItems';
 import { groupForPath } from 'src/settingGroups';
+import { isMobileApp, isPhoneApp } from 'src/utils/platform';
+import { nextFrame } from 'src/utils/renderHost';
 
 const formSchema: FormSchema<ISettings> = [
+  {
+    label: '导出主题',
+    path: 'themeMode',
+    type: 'select',
+    desc: '跟随主题随 Obsidian 当前外观；浅色 / 深色强制导出图使用固定配色。',
+    options: [
+      { text: '跟随主题', value: 'follow' },
+      { text: '浅色', value: 'light' },
+      { text: '深色', value: 'dark' },
+    ],
+  },
   {
     label: '剔除笔记信息',
     path: 'stripNoteInfo',
@@ -211,12 +224,23 @@ const ModalContent: FC<{
   const [isGrabbing, setIsGrabbing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const previewOutRef = useRef<HTMLDivElement>(null);
-  const mainHeight = Math.min(764, (window.innerHeight * 0.85) - 225);
+  // The preview pane fills the modal height (the modal is pinned to 85vh), so
+  // measure it instead of hard-coding the window chrome offset. The value only
+  // changes when the window is resized; the pane itself is flex-sized.
+  const [mainHeight, setMainHeight] = useState(
+    () => Math.max(320, Math.round(window.innerHeight * 0.85) - 200),
+  );
   const root = useRef<TargetRef>(null);
 
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
+
+  useEffect(() => () => {
+    // Closing the dialog drops the files rendered for a share sheet that was
+    // never opened; keeping them alive would leak a multi-megabyte bitmap.
+    discardPendingShare();
+  }, []);
 
   useEffect(() => {
     const serialized = JSON.stringify(formData);
@@ -252,10 +276,16 @@ const ModalContent: FC<{
   }, [markdownEl]);
 
   const [processing, setProcessing] = useState(false);
+  const [awaitingShare, setAwaitingShare] = useState(false);
   const [allowCopy, setAllowCopy] = useState(true);
   const [rootHeight, setRootHeight] = useState(0);
   const [pages, setPages] = useState(1);
   const [scale, setScale] = useState(1);
+  const isPhone = isPhoneApp();
+  // Phones get a tab switch instead of stacking the long settings form above
+  // the preview; the preview is what the dialog is for, so it opens first.
+  const [mobileTab, setMobileTab] = useState<'preview' | 'settings'>('preview');
+  const cancelRef = useRef(false);
 
   // 添加日志检查函数
   useEffect(() => {
@@ -263,17 +293,37 @@ const ModalContent: FC<{
     console.log("markdownEl content:", markdownEl instanceof HTMLElement ? markdownEl.innerHTML.substring(0, 100) + "..." : "Not HTML Element");
   }, [isLoading, markdownEl]);
 
+  // The pane is flex-sized by the modal layout; keep the numeric height used
+  // by the pan/zoom viewport in sync with it (and with window resizes).
+  useLayoutEffect(() => {
+    const out = previewOutRef.current;
+    if (!out) return;
+
+    const update = () => {
+      const next = Math.round(out.clientHeight);
+      if (next <= 0) return;
+      setMainHeight(previous => (Math.abs(previous - next) < 1 ? previous : next));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(out);
+    return () => observer.disconnect();
+  }, []);
+
   const calculateScale = useCallback(() => {
     if (!root.current?.element || !previewOutRef.current) return 1;
     const contentHeight = root.current.element.clientHeight;
     const contentWidth = root.current.element.clientWidth;
     const previewWidth = previewOutRef.current.clientWidth;
+    // Hidden pane (mobile tab) or not laid out yet: keep a sane minimum.
+    if (!previewWidth) return 1;
 
     return Math.min(
       1,
       mainHeight / (contentHeight || 100),
       previewWidth / ((contentWidth || 0) + 2),
-    ) / 2;
+    ) / (isPhoneApp() ? 1 : 2);
   }, [mainHeight]);
 
   useEffect(() => {
@@ -311,6 +361,15 @@ const ModalContent: FC<{
     });
   }, [formData.format]);
 
+  const waitForPreviewLayout = useCallback(async () => {
+    // The settings tab hides the preview with `display:none`; the capture
+    // needs a laid-out element, so wait until the browser has measured it.
+    for (let i = 0; i < 40; i++) {
+      if (root.current?.contentElement?.clientWidth) return;
+      await nextFrame();
+    }
+  }, []);
+
   const handleSave = useCallback(async () => {
     if ((formData.width || 640) <= 20) {
       new Notice(L.invalidWidth());
@@ -319,21 +378,31 @@ const ModalContent: FC<{
     if (!root.current) return;
 
     onSettingsChange?.(formData);
+    cancelRef.current = false;
+    setAwaitingShare(false);
     setProcessing(true);
     try {
-      await save(
+      // A hidden pane has no layout, so a capture taken from the settings tab
+      // would be 0×0 (or the wrong size). Bring the preview back first.
+      if (isPhone && mobileTab !== 'preview') {
+        setMobileTab('preview');
+        await waitForPreviewLayout();
+      }
+      const outcome = await save(
         app,
         root.current.contentElement,
         title,
         formData.resolutionMode,
         formData.format,
-        Platform.isMobile,
+        isMobileApp(),
+        () => cancelRef.current,
       );
-    } catch {
-      new Notice(L.saveFail());
+      setAwaitingShare(outcome === 'awaiting-share');
+    } catch (error) {
+      new Notice(error instanceof ExportCancelledError ? '已取消导出' : L.saveFail());
     }
     setProcessing(false);
-  }, [root, formData.resolutionMode, formData.format, title, formData.width]);
+  }, [root, formData, title, isPhone, mobileTab, waitForPreviewLayout]);
   const handleCopy = useCallback(async () => {
     if ((formData.width || 640) <= 20) {
       new Notice(L.invalidWidth());
@@ -344,7 +413,7 @@ const ModalContent: FC<{
     onSettingsChange?.(formData);
     setProcessing(true);
     try {
-      await copy(root.current.contentElement, formData.resolutionMode, formData.format);
+      await copy(app, root.current.contentElement, formData.resolutionMode, formData.format);
     } catch {
       new Notice(L.copyFail());
     }
@@ -360,9 +429,15 @@ const ModalContent: FC<{
     if (!root.current) return;
 
     onSettingsChange?.(formData);
+    cancelRef.current = false;
+    setAwaitingShare(false);
     setProcessing(true);
     try {
-      await saveAll(
+      if (isPhone && mobileTab !== 'preview') {
+        setMobileTab('preview');
+        await waitForPreviewLayout();
+      }
+      const outcome = await saveAll(
         root.current,
         formData.format,
         formData.resolutionMode,
@@ -371,17 +446,49 @@ const ModalContent: FC<{
         formData.split.mode,
         app,
         title,
+        () => cancelRef.current,
       );
-    } catch {
-      new Notice(L.copyFail());
+      setAwaitingShare(outcome === 'awaiting-share');
+    } catch (error) {
+      new Notice(error instanceof ExportCancelledError ? '已取消导出' : L.copyFail());
     }
     setProcessing(false);
-  }, [root, formData.format, formData.resolutionMode, formData.split, app, title]);
+  }, [root, formData, app, title, isPhone, mobileTab, waitForPreviewLayout]);
+
+  const handleSharePending = useCallback(async () => {
+    // Runs straight from the tap, so the share sheet gets a live activation.
+    const outcome = await sharePendingFiles();
+    setAwaitingShare(outcome === 'awaiting-share');
+  }, []);
+
+  const handleDismissPending = useCallback(() => {
+    discardPendingShare();
+    setAwaitingShare(false);
+  }, []);
 
   return (
     <div className='export-image-preview-root'>
+      {isPhone && (
+        <div className='export-image-mobile-tabs'>
+          <button
+            className={mobileTab === 'preview' ? 'is-active' : ''}
+            onClick={() => setMobileTab('preview')}
+          >
+            预览
+          </button>
+          <button
+            className={mobileTab === 'settings' ? 'is-active' : ''}
+            onClick={() => setMobileTab('settings')}
+          >
+            设置
+          </button>
+        </div>
+      )}
       <div className='export-image-preview-main'>
-        <div className='export-image-preview-left'>
+        <div
+          className='export-image-preview-left'
+          style={isPhone && mobileTab !== 'settings' ? { display: 'none' } : undefined}
+        >
           <FormItems
             formSchema={groupedFormSchema}
             update={setFormData}
@@ -396,12 +503,14 @@ const ModalContent: FC<{
           </div>}
           <div className='info-text'>{L.moreSetting()}</div>
         </div>
-        <div className='export-image-preview-right'>
+        <div
+          className='export-image-preview-right'
+          style={isPhone && mobileTab !== 'preview' ? { display: 'none' } : undefined}
+        >
           <div
             className='export-image-preview-out'
             ref={previewOutRef}
             style={{
-              height: mainHeight,
               cursor: isGrabbing ? 'grabbing' : 'grab',
             }}
           >
@@ -460,7 +569,7 @@ const ModalContent: FC<{
         </div>
       </div>
       <div className='export-image-preview-actions'>
-        {pages === 1 && (
+        {!isPhone && pages === 1 && (
           <div>
             <button onClick={handleCopy} disabled={processing || !allowCopy || isLoading}>
               {L.copy()}
@@ -470,9 +579,23 @@ const ModalContent: FC<{
         )}
 
         <button onClick={() => pages === 1 ? handleSave() : handleSaveAll()} disabled={processing || isLoading}>
-          {Platform.isMobile ? L.saveVault() : L.save()}
+          {isMobileApp() ? '分享' : L.save()}
         </button>
       </div>
+      {processing && (
+        <div className='export-image-exporting'>
+          <div className='export-image-loading-spinner' />
+          <div className='export-image-exporting-text'>正在导出…</div>
+          <button onClick={() => { cancelRef.current = true; }}>取消</button>
+        </div>
+      )}
+      {awaitingShare && !processing && (
+        <div className='export-image-exporting'>
+          <div className='export-image-exporting-text'>图片已生成</div>
+          <button className='mod-cta' onClick={handleSharePending}>分享</button>
+          <button onClick={handleDismissPending}>取消</button>
+        </div>
+      )}
     </div>
   );
 };

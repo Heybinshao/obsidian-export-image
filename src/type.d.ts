@@ -1,5 +1,8 @@
 declare type FileFormat = 'png0' | 'png1' | 'jpg' | 'pdf' | 'webp';
 
+declare type ThemeMode = 'follow' | 'light' | 'dark';
+
+
 // eslint-disable-next-line @typescript-eslint/naming-convention
 declare type ISettings = {
   width?: number;
@@ -9,6 +12,7 @@ declare type ISettings = {
   showMetadata: boolean;
   stripNoteInfo?: boolean;
   tableForceWrap?: boolean;
+  themeMode?: ThemeMode;
   recursive: boolean;
   quickExportSelection: boolean;
   padding: {

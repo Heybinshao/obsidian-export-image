@@ -4,6 +4,7 @@ import set from 'lodash/set';
 import debounce from 'lodash/debounce';
 import { requestUrl, setIcon, type App, Modal } from 'obsidian';
 import { fileToBase64 } from '../../../utils';
+import { compressAvatar } from 'src/utils/image';
 import L from '../../../L';
 import ImageSelectModal from '../imageSelectModal';
 import { getRemoteImageUrl } from 'src/utils/capture';
@@ -49,18 +50,25 @@ const Control: FC<{
     processImage();
   }, [value, fieldSchema.type]);
 
+  const isAvatar = fieldSchema.path === 'authorInfo.avatar';
+  const prepareFileValue = async (source: string) => (
+    isAvatar ? compressAvatar(source) : source
+  );
+
   const upload = async () => {
     const file = inputReference.current?.files?.[0];
     if (file) {
-      onChange(await fileToBase64(file));
+      onChange(await prepareFileValue(await fileToBase64(file)));
       inputReference.current!.value = '';
     }
   };
 
   const select = () => {
     const modal = new ImageSelectModal(app, img => {
-      onChange(img);
-      modal.close();
+      void prepareFileValue(img).then(value => {
+        onChange(value);
+        modal.close();
+      });
     });
     modal.open();
   };
@@ -70,6 +78,7 @@ const Control: FC<{
       return (
         <input
           type='number'
+          inputMode='decimal'
           value={value}
           onChange={e => {
             onChange(e.target.value ? Number(e.target.value) : undefined);
@@ -125,7 +134,7 @@ const Control: FC<{
     case 'file': {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px' }}>
             <div
               className='user-info-avatar'
               style={{
@@ -170,6 +179,7 @@ const Control: FC<{
               <input
                 style={{ display: 'none' }}
                 type='file'
+                accept='image/*'
                 ref={inputReference}
                 onChange={upload}
               />

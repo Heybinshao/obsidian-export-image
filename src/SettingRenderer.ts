@@ -8,6 +8,7 @@ import type { SettingItem } from './formConfig';
 import { SETTING_GROUPS, groupRank } from './settingGroups';
 import L from './L';
 import { delay, fileToBase64 } from './utils';
+import { compressAvatar } from './utils/image';
 import ImageSelectModal from './components/common/imageSelectModal';
 import { renderPreview } from './settingPreview';
 import type ExportImagePlugin from './ExportImagePlugin';
@@ -102,6 +103,7 @@ export class SettingRenderer {
         case 'number':
           setting.addText(text => {
             text.inputEl.type = 'number';
+            text.inputEl.inputMode = 'decimal';
             text.setValue(String(this.getSettingValue(item.id) ?? ''))
               .setPlaceholder(item.placeholder ?? '')
               .onChange(async value => {
@@ -153,7 +155,7 @@ export class SettingRenderer {
           });
 
           const buttonContainer = containerDiv.createDiv({
-            attr: { style: 'display: flex; gap: 8px' },
+            attr: { style: 'display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px' },
           });
 
           // 创建预览区域
@@ -206,6 +208,7 @@ export class SettingRenderer {
           const fileInput = createEl('input', {
             attr: {
               type: 'file',
+              accept: 'image/*',
               style: 'display: none',
             },
           });
@@ -220,7 +223,10 @@ export class SettingRenderer {
             const file = fileInput.files?.[0];
             if (file) {
               const base64 = await fileToBase64(file);
-              await this.updateSetting(item.id, base64);
+              await this.updateSetting(
+                item.id,
+                item.id === 'authorInfo.avatar' ? await compressAvatar(base64) : base64,
+              );
               fileInput.value = '';
             }
           };
@@ -232,7 +238,10 @@ export class SettingRenderer {
 
           selectButton.onclick = () => {
             const modal = new ImageSelectModal(this.app, async (img) => {
-              await this.updateSetting(item.id, img);
+              await this.updateSetting(
+                item.id,
+                item.id === 'authorInfo.avatar' ? await compressAvatar(img) : img,
+              );
               modal.close();
             });
             modal.open();
