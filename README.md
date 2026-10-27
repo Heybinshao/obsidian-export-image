@@ -1,12 +1,12 @@
 # 「binshao」Export Image
 
-> 这是 [zhouhua/obsidian-export-image](https://github.com/zhouhua/obsidian-export-image) 的 fork，面向 Obsidian 1.15+（Pele）重写了导出管线，并补了设置持久化、移动端 canvas/相册路径、图片原图与字体按需内嵌。
+> 本仓库基于 [zhouhua/obsidian-export-image](https://github.com/zhouhua/obsidian-export-image)（MIT），面向 Obsidian 1.15+（Pele）重写了导出管线，并补了设置持久化、移动端导出与分享、图片原图与字体按需内嵌。
 >
 > 原项目 MIT，Copyright (c) 2024 Zhou Hua；本 fork 的修改 Copyright (c) 2026 binshao。原项目与本 fork 无隶属关系，完整归属声明见 [NOTICE](./NOTICE)。
 
 This Obsidian plugin can easily help you export any article as an image.
 
-## Fork changes
+## Changes over upstream
 
 - 导出改为在导出宽度下用 `MarkdownRenderer` 重新渲染，不再抓编辑器 DOM。
 - 适配 Obsidian 1.15+ 的 Pele：按导出宽度重挂载、移除 `.pele-zoom`、等字体稳定。
@@ -45,13 +45,18 @@ Also, you can access this function from the editor menu:
 ![](./assets/menu.png)
 
 > [!NOTE]
-> Due to device limitations, exporting images on mobile can only be saved to the current vault.
+> On mobile, the export is handed to the system share sheet (choose *Save Image* there to write it to your photo library). The plugin does not copy the image into your vault.
 
 ## Installation
 
-### Obsidian
+This build is not listed in the Obsidian community plugins directory, so it needs to be installed manually:
 
-Search `Export Image` in community plugins.
+1. Download `main.js`, `manifest.json`, `styles.css` from the [latest release](../../releases/latest).
+2. Put them into `<your vault>/.obsidian/plugins/obsidian-export-image/`.
+3. Restart Obsidian, then enable **「binshao」Export Image** under Settings → Community plugins.
+
+> [!NOTE]
+> This plugin keeps the upstream plugin id `obsidian-export-image`, so installing it side by side with the directory version replaces that entry and **shares its `data.json`**. If you want both installed, rename the plugin folder and the `id` in `manifest.json`.
 
 ## Custom Styles
 
@@ -102,19 +107,20 @@ To help experienced users write their own CSS styles, here is the combined DOM s
 
 ## Star History
 
-<a href="https://star-history.com/#zhouhua/obsidian-export-image&Date">
+<a href="https://star-history.com/#Heybinshao/obsidian-export-image&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=zhouhua/obsidian-export-image&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=zhouhua/obsidian-export-image&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=zhouhua/obsidian-export-image&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Heybinshao/obsidian-export-image&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Heybinshao/obsidian-export-image&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Heybinshao/obsidian-export-image&type=Date" />
  </picture>
 </a>
 
 ## Special Thanks
 
-- [dom-to-image](https://github.com/tsayen/dom-to-image) & [dom-to-image-more](https://github.com/1904labs/dom-to-image-more). This repo borrows lots of code from [dom-to-image-more](https://github.com/1904labs/dom-to-image-more). The amazing lib helps me generate images from dom.
+- [Zhou Hua](https://github.com/zhouhua) for the [original plugin](https://github.com/zhouhua/obsidian-export-image) this project builds on.
+- [dom-to-image](https://github.com/tsayen/dom-to-image) & [dom-to-image-more](https://github.com/1904labs/dom-to-image-more). This repo borrows lots of code from [dom-to-image-more](https://github.com/1904labs/dom-to-image-more). The amazing lib helps generate images from dom.
 
-## My Other Obsidian Plugins
+## Upstream author's other plugins
 
 - [Markdown Media Card](https://github.com/zhouhua/obsidian-markdown-media-card)
 - [vConsole](https://github.com/zhouhua/obsidian-vconsole)
