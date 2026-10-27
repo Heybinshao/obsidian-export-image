@@ -13,6 +13,7 @@
 - 2026-10-27：M2 保真补充。内嵌图片通过 `vault.resolveFileUrl` 找回原文件并转 data URL，避免 2x/3x 放大显示分辨率图；PDF 改用 PNG 入页；CI 改 pnpm + 单一 lockfile。新增图片 hydrate 测试，12 个测试全绿。
 - 2026-10-27：交互与移动端。修复 `.user-info-container` 的 `alignitems` 拼写错误，头像/名称（含 remark）统一垂直居中；默认边距改 20；导出弹窗设置 400ms 防抖持久化；手机端按 16M px 预算自动降 scale，保存优先走 Media/分享面板，失败回退 vault。
 - 2026-10-27：测试库已删除（移入系统废纸篓），Obsidian 已切到 `自用主库`；新插件已覆盖安装，旧版备份留在本机归档目录。
+- 2026-10-27：仓库以**独立公开仓**发布（`Heybinshao/obsidian-export-image`），保留 `upstream` remote 与全部归属声明。发布前用 `git filter-repo --replace-text` 对全历史做了脱敏（vault 名、本机路径、个人片段名、内容平台标识），只改写 3 份 docs 文件的内容，源码/样式/测试逐字节未变。**副作用**：filter-repo 会剥掉 GitHub 提交上的 GPG 签名头，因此全部 commit hash 变化，改写后的提交图与上游原始提交图**没有共同祖先**——以后同步上游不能用 `git merge upstream/master`，改用「比对本机 `refs/remotes/upstream/master` 的 diff/patch 后挑选改动」，或一次性 `--allow-unrelated-histories` 合并。
 - 2026-10-27：新增 `docs/iteration-directions.md`，记录 P0/P1/P2 迭代方向。
 - 2026-10-27：按 binshao 插件命名规范改为 `「binshao」Export Image`（author=binshao，authorUrl=binshao.top，中文描述）；README 顶部加 fork 声明，新增 NOTICE，LICENSE 保留原作者并追加 fork 版权；设置页改为「Fork by binshao + 原项目」双链接。插件 id 暂保留 `obsidian-export-image`，避免现有 `data.json` 失效。
 - 2026-10-27：修复设置页头像预览：`.user-info-avatar img` 改为 absolute + inset 0 + object-fit cover + 50% radius，删除按钮 z-index 提升；补 CSS 回归测试和头像视觉 harness。当前 5 个测试文件 / 16 个测试全绿。
